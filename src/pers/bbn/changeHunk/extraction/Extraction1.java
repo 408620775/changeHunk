@@ -27,7 +27,6 @@ import java.util.Set;
  * 除了基本表，miningit还需执行extension=bugFixMessage，metrics
  *
  * @author niu
- *
  */
 public final class Extraction1 extends Extraction {
     private List<String> curAttributes;
@@ -36,12 +35,9 @@ public final class Extraction1 extends Extraction {
     /**
      * 提取第一部分change info，s为指定开始的commit_id，e为结束的commit_id
      *
-     * @param database
-     *            指定的miningit生成数据的数据库。
-     * @param s
-     *            指定的commit的起始值,从1开始算.
-     * @param e
-     *            指定的commit的结束值
+     * @param database 指定的miningit生成数据的数据库。
+     * @param s        指定的commit的起始值,从1开始算.
+     * @param e        指定的commit的结束值
      * @throws Exception
      */
     public Extraction1(String database, int s, int e) throws Exception {
@@ -86,12 +82,14 @@ public final class Extraction1 extends Extraction {
      * @throws SQLException
      */
     public void CreateTable() throws SQLException {
-        sql = "create table extraction1(id int(11) primary key not null auto_increment,commit_id int(11),file_id int(11),author_name varchar(255),commit_day varchar(15),commit_hour int(2),"
-                + "cumulative_change_count int(15) default 0,cumulative_bug_count int(15) default 0,change_log_length int(10),changed_LOC int(13),"
-                + "sloc int(15),bug_introducing tinyint(1) default 0)";
+        sql = "create table meta(id int(11) primary key not null auto_increment,commit_id int(11),file_id int(11),"
+                + "hunk_id int(11), author_name varchar(40),commit_day varchar(15),commit_hour int(2),"
+                + "cumulative_change_count int(15) default 0,cumulative_bug_count int(15) default 0,"
+                + "change_log_length int(5),changed_LOC int(7),"
+                + "sloc int(7),bug_introducing tinyint(1) default 0)";
         int result = stmt.executeUpdate(sql);
         if (result != -1) {
-            System.out.println("创建表extraction1成功");
+            System.out.println("创建表meta成功");
         }
     }
 
@@ -206,8 +204,8 @@ public final class Extraction1 extends Extraction {
 
         // System.out.println(mapD.size()); //测试是否提取出时间，结果正确
         Calendar calendar = Calendar.getInstance();// 获得一个日历
-        String[] str = { "Sunday", "Monday", "Tuesday", "Wednesday",
-                "Thursday", "Friday", "Saturday", };
+        String[] str = {"Sunday", "Monday", "Tuesday", "Wednesday",
+                "Thursday", "Friday", "Saturday",};
         for (Integer i : mapD.keySet()) {
             int year = Integer.parseInt(mapD.get(i).split("-")[0]);
             int month = Integer.parseInt(mapD.get(i).split("-")[1]);
@@ -289,7 +287,7 @@ public final class Extraction1 extends Extraction {
     /**
      * 获取源码长度。 得到表metrics的复杂度开销很大，
      * 而得到的信息在此后的extraction2中非常方便的提取，所以真心觉得此处提起这个度量没有什么意义。
-     *
+     * <p>
      * 但是由于需要获取size()中的lt属性值,还必须得有sloc才好算.而extraction2写入数据库的时间成本过高,所以在merger时,
      * extraction2的信息往往是根据metrics的txt直接生成的,而非从数据库中提取.所以本方法也必须依赖于metrics
      * txt来获取sloc的值.
@@ -334,8 +332,7 @@ public final class Extraction1 extends Extraction {
      * 获取累计的bug计数。首先得判断出某个commit_id，file_id对应的那个文件是否是bug_introducing。
      * 也就是本程序需要在bug_introducing之后执行.
      *
-     * @throws Exception
-     *             主要是为了想体验一下这个异常怎么用才加的，其实没啥用，因为bug_introducing非常不可能出现除0,1外的其他值。
+     * @throws Exception 主要是为了想体验一下这个异常怎么用才加的，其实没啥用，因为bug_introducing非常不可能出现除0,1外的其他值。
      */
     // FIXME 此函数也需要在resources包中的history.py中实现.但是目前还没有发现其实现办法.
     public void cumulative_bug_count() throws Exception {
@@ -1093,9 +1090,8 @@ public final class Extraction1 extends Extraction {
      * 根据年份对change进行加权平均,以评估rexp.默认上次更改据现在不会超过9年.有点粗糙,比如,如果同年的一月和十二月的差距会算作零年,
      * 但是前年12月和后年一月会算作一年的差距.
      *
-     * @param datesList
-     *            输入的做出change的年份list.其中最后一个元素为作者当前所做的change,也就是year为当前的标准(
-     *            最新的year).
+     * @param datesList 输入的做出change的年份list.其中最后一个元素为作者当前所做的change,也就是year为当前的标准(
+     *                  最新的year).
      * @return
      */
     private float changeWeightedByYear(List<String> datesList) {
@@ -1129,8 +1125,7 @@ public final class Extraction1 extends Extraction {
     /**
      * 根据给定的commit_fileId对,返回每个对儿对应的类标签.
      *
-     * @param someCommit_fileIds
-     *            要求返回类标签的commit_fileId对.
+     * @param someCommit_fileIds 要求返回类标签的commit_fileId对.
      * @return 包含类标签的map信息.
      * @throws SQLException
      * @throws InsExistenceException
