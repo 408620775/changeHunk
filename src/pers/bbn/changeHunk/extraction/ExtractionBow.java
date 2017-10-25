@@ -38,7 +38,7 @@ import java.util.Set;
  * @author niu
  *
  */
-public class Extraction3 extends Extraction {
+public class ExtractionBow extends Extraction {
     Map<String, String> dictionary;
     Set<String> currStrings;
     Map<List<Integer>, StringBuffer> contentMap;
@@ -56,8 +56,8 @@ public class Extraction3 extends Extraction {
      * @throws Exception
      */
     //FIXME 由于setICFfromDatabase存在问题,本方法也有待改进.
-    public Extraction3(String database, String projectHome, int startId,
-                       int endId) throws Exception {
+    public ExtractionBow(String database, String projectHome, int startId,
+                         int endId) throws Exception {
         super(database,startId,endId);
 
         dictionary = new HashMap<>();

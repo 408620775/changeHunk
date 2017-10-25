@@ -28,7 +28,7 @@ import java.util.Set;
  *
  * @author niu
  */
-public final class Extraction1 extends Extraction {
+public final class ExtractionMeta extends Extraction {
     private List<String> curAttributes;
     private List<List<Integer>> commit_file_inExtracion1;
 
@@ -40,7 +40,7 @@ public final class Extraction1 extends Extraction {
      * @param e        指定的commit的结束值
      * @throws Exception
      */
-    public Extraction1(String database, int s, int e) throws Exception {
+    public ExtractionMeta(String database, int s, int e) throws Exception {
         super(database, s, e);
     }
 
@@ -1192,12 +1192,12 @@ public final class Extraction1 extends Extraction {
         String database = "My"
                 + project.toLowerCase().substring(0, 1).toUpperCase()
                 + project.toLowerCase().substring(1);
-        Extraction1 extraction1 = new Extraction1(database, start_commit_id,
+        ExtractionMeta extractionMeta = new ExtractionMeta(database, start_commit_id,
                 end_commit_id);
-        extraction1.mustTotal();
-        extraction1.canPart();
+        extractionMeta.mustTotal();
+        extractionMeta.canPart();
 
-        // Extraction2 extraction2 = new Extraction2(database, start_commit_id,
+        // ExtractionMetrics extraction2 = new ExtractionMetrics(database, start_commit_id,
         // end_commit_id);
         // extraction2.Get_icfId();
         // Process process = Runtime.getRuntime().exec(
@@ -1212,24 +1212,24 @@ public final class Extraction1 extends Extraction {
         String database = "My"
                 + project.toLowerCase().substring(0, 1).toUpperCase()
                 + project.toLowerCase().substring(1);
-        Extraction1 extraction1 = new Extraction1(database, start_commit_id,
+        ExtractionMeta extractionMeta = new ExtractionMeta(database, start_commit_id,
                 end_commit_id);
-        Extraction2 extraction2 = new Extraction2(database, start_commit_id,
+        ExtractionMetrics extractionMetrics = new ExtractionMetrics(database, start_commit_id,
                 end_commit_id);
         String metric = database + "Metrics.txt";
-        extraction2.extraFromTxt(metric);
-        Extraction3 extraction3 = new Extraction3(database, project + "Files",
+        extractionMetrics.extraFromTxt(metric);
+        ExtractionBow extractionBow = new ExtractionBow(database, project + "Files",
                 start_commit_id, end_commit_id);
 
-        List<List<Integer>> commit_fileIds = extraction1.commit_fileIds;
+        List<List<Integer>> commit_fileIds = extractionMeta.commit_fileIds;
         List<Map<List<Integer>, StringBuffer>> list = new ArrayList<>();
-        Map<List<Integer>, StringBuffer> map1 = extraction1
+        Map<List<Integer>, StringBuffer> map1 = extractionMeta
                 .getContentMap(commit_fileIds);
         checkConsistency(map1);
-        Map<List<Integer>, StringBuffer> map2 = extraction2
+        Map<List<Integer>, StringBuffer> map2 = extractionMetrics
                 .getContentMap(commit_fileIds);
         checkConsistency(map2);
-        Map<List<Integer>, StringBuffer> map3 = extraction3
+        Map<List<Integer>, StringBuffer> map3 = extractionBow
                 .getContentMap(commit_fileIds);
         checkConsistency(map3);
         list.add(map1);
@@ -1253,9 +1253,9 @@ public final class Extraction1 extends Extraction {
     public static void main(String[] args) throws Exception {
         // Automatic1("hadoop", 10001, 10300);
         Automatic2("hadoop", 5501, 5800);
-        // Extraction1 extraction1=new Extraction1("MyHadoop", 5501, 6000);
+        // ExtractionMeta extraction1=new ExtractionMeta("MyHadoop", 5501, 6000);
         // extraction1.canPart();
-        // Extraction2 extraction2 = new Extraction2("MyHadoop", 5501,
+        // ExtractionMetrics extraction2 = new ExtractionMetrics("MyHadoop", 5501,
         // 6000);
         // extraction2.Get_icfId();
         // extraction2.recoverPreFile("hadoopFiles");

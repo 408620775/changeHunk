@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Set;
 
 
-public final class Extraction2 extends Extraction {
+public final class ExtractionMetrics extends Extraction {
     private Set<String> curFiles;
     private Set<String> preFiles;
     private Set<String> attributes;
@@ -34,7 +34,7 @@ public final class Extraction2 extends Extraction {
      * @param eCommitId
      * @throws Exception
      */
-    public Extraction2(String database, int sCommitId, int eCommitId)
+    public ExtractionMetrics(String database, int sCommitId, int eCommitId)
             throws Exception {
         super(database, sCommitId, eCommitId);
     }
@@ -382,7 +382,7 @@ public final class Extraction2 extends Extraction {
     }
 
     public static void main(String[] args) throws Exception {
-        Extraction2 extraction2=new Extraction2("MyFlink",1001, 1300);
-        extraction2.recoverPreFile("flinkFiles");
+        ExtractionMetrics extractionMetrics =new ExtractionMetrics("MyFlink",1001, 1300);
+        extractionMetrics.recoverPreFile("flinkFiles");
     }
 }
