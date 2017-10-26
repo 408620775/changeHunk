@@ -1,4 +1,4 @@
-package pers.bbn.changeHunk.extraction;
+package main.extraction;
 
 import java.util.HashMap;
 import java.util.Map;

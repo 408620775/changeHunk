@@ -1,4 +1,4 @@
-package pers.bbn.changeHunk.exception;
+package main.exception;
 
 public class InsExistenceException extends Exception{
 

@@ -1,4 +1,4 @@
-package pers.bbn.changeHunk.extraction;
+package main.extraction;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -17,23 +17,23 @@ import java.util.Set;
 /**
  * 提取源码信息路径信息。
  *
- * @param id_commitId_fileIds
+ * id_commitId_fileIds
  *            由所有id、commit_id和file_id构成的主键列表。
- * @param dictionary
+ * dictionary
  *            存放实际属性名称和属性代号名称对的map。key值为实际属性名称。
- * @param dictionary2
+ * dictionary2
  *            存放属性代号名称和实际属性名称对的map。
- * @param currStrings
+ * currStrings
  *            当前出现过的属性。
- * @param bow
+ * bow
  *            用以提取源码信息路径信息的词向量类。
- * @param content
+ * content
  *            实际得到的各实例，key为id_commitId_fileIds中的元素，value为对应的属性值。当key值为(-1,-1,-1)
  *            时对应的值为属性名称。
- * @param colMap
+ * colMap
  *            content中属性及其索引的map。因为在持续更新实例中数据的过程中，某个实例的某个属性值可能需要改变
  *            则可根据此map快速对应到content中该属性的值，然后将其修改。
- * @param headmap
+ * headmap
  *            content中的属性字段，即存放所有属性名称的map。
  * @author niu
  *

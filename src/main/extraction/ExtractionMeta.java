@@ -1,25 +1,13 @@
-package pers.bbn.changeHunk.extraction;
+package main.extraction;
 
-import pers.bbn.changeHunk.exception.InsExistenceException;
+import main.exception.InsExistenceException;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 
 /**
  * 从miningit生成的数据库中提取一些基本信息，例如作者姓名，提交时间，累计的bug计数等信息。 构造函数中提供需要连接的数据库。
@@ -31,6 +19,9 @@ import java.util.Set;
 public final class ExtractionMeta extends Extraction {
     private List<String> curAttributes;
     private List<List<Integer>> commit_file_inExtracion1;
+    private static String databaseName = "hunk1";
+    private static String databaseNameKey = "databaseName";
+
 
     /**
      * 提取第一部分change info，s为指定开始的commit_id，e为结束的commit_id
@@ -42,6 +33,16 @@ public final class ExtractionMeta extends Extraction {
      */
     public ExtractionMeta(String database, int s, int e) throws Exception {
         super(database, s, e);
+    }
+
+    public void loadProperty(String propertyFilePath) throws IOException {
+        Properties properties = new Properties();
+        File propertyFile = new File(propertyFilePath);
+        FileReader fReader = new FileReader(propertyFile);
+        properties.load(fReader);
+        if (properties.containsKey(databaseNameKey)){
+            databaseName = properties.getProperty(databaseNameKey);
+        }
     }
 
     /**
@@ -61,7 +62,7 @@ public final class ExtractionMeta extends Extraction {
     }
 
     /**
-     * extraction1表中可以选择一部分一部分执行的信息.
+     * hunk1表中可以选择一部分一部分执行的信息.
      *
      * @throws Exception
      */
@@ -74,10 +75,10 @@ public final class ExtractionMeta extends Extraction {
     }
 
     /**
-     * 创建数据表extraction1。 若构造函数中所连接的数据库中已经存在extraction1表，则会产生冲突。
-     * 解决方案有2：（1）若之前的extraction1为本程序生成的表，则可将其卸载。
-     * （2）若之前的extraction1为用户自己的表，则可考虑备份原表的数据，并删除原表（建议），
-     * 或者重命名本程序中的extraction1的名称（不建议）。
+     * 创建数据表hunk1。 若构造函数中所连接的数据库中已经存在hunk1表，则会产生冲突。
+     * 解决方案有2：（1）若之前的hunk1为本程序生成的表，则可将其卸载。
+     * （2）若之前的hunk1为用户自己的表，则可考虑备份原表的数据，并删除原表（建议），
+     * 或者重命名本程序中的hunk1的名称（不建议）。
      *
      * @throws SQLException
      */
@@ -94,9 +95,9 @@ public final class ExtractionMeta extends Extraction {
     }
 
     /**
-     * 初始化表格。 根据指定范围内的按时间排序的commit列表（commit_ids）初始化extraction1。
+     * 初始化表格。 根据指定范围内的按时间排序的commit列表（commit_ids）初始化hunk1。
      * 初始化内容包括id，commit_id，file_id。需要注意的是，目前只考虑java文件，且不考虑java中的测试文件
-     * 所以在actions表中选择对应的项时需要进行过滤。由于SZZ算法需要回溯,所以在初始化extraction1表的时候需要考虑所有actions.
+     * 所以在actions表中选择对应的项时需要进行过滤。由于SZZ算法需要回溯,所以在初始化hunk1表的时候需要考虑所有actions.
      *
      * @throws SQLException
      */
@@ -119,7 +120,7 @@ public final class ExtractionMeta extends Extraction {
             }
 
             for (List<Integer> list2 : list) {
-                sql = "insert extraction1 (commit_id,file_id) values("
+                sql = "insert hunk1 (commit_id,file_id) values("
                         + list2.get(0) + "," + list2.get(1) + ")";
                 stmt.executeUpdate(sql);
             }
@@ -127,7 +128,7 @@ public final class ExtractionMeta extends Extraction {
     }
 
     /**
-     * 查看当前extraction1表中所有已存在的属性,对外的接口.
+     * 查看当前hunk1表中所有已存在的属性,对外的接口.
      *
      * @return
      * @throws SQLException
@@ -140,14 +141,14 @@ public final class ExtractionMeta extends Extraction {
     }
 
     /**
-     * 将extraction1表中现有的属性填入curAttributes.
+     * 将hunk1表中现有的属性填入curAttributes.
      *
      * @throws SQLException
      */
     private void obtainCurAttributes() throws SQLException {
         if (curAttributes == null) {
             curAttributes = new ArrayList<>();
-            sql = "desc extraction1";
+            sql = "desc hunk1";
             resultSet = stmt.executeQuery(sql);
             while (resultSet.next()) {
                 curAttributes.add(resultSet.getString(1));
@@ -156,7 +157,7 @@ public final class ExtractionMeta extends Extraction {
     }
 
     /**
-     * 获取作者姓名。如果excuteAll为真,则获取extraction1中所有数据的作者.
+     * 获取作者姓名。如果excuteAll为真,则获取hunk1中所有数据的作者.
      * 否则只获取commit_id在commitIdPart中的数据的作者.
      *
      * @throws SQLException
@@ -170,16 +171,16 @@ public final class ExtractionMeta extends Extraction {
         }
         System.out.println("get author_name");
         for (Integer integer : excuteList) {
-            sql = "update extraction1,scmlog,people set extraction1.author_name=people.name where extraction1.commit_id="
+            sql = "update hunk1,scmlog,people set hunk1.author_name=people.name where hunk1.commit_id="
                     + integer
-                    + " and extraction1.commit_id="
+                    + " and hunk1.commit_id="
                     + "scmlog.id and scmlog.author_id=people.id";
             stmt.executeUpdate(sql);
         }
     }
 
     /**
-     * 获取提交的日期，以星期标示。如果excuteAll为真,则获取extraction1中所有数据的日期.
+     * 获取提交的日期，以星期标示。如果excuteAll为真,则获取hunk1中所有数据的日期.
      * 否则只获取commit_id在commitIdPart中的数据的日期.
      *
      * @throws SQLException
@@ -214,14 +215,14 @@ public final class ExtractionMeta extends Extraction {
             calendar.set(year, month - 1, day);// 设置当前时间,月份是从0月开始计算
             int number = calendar.get(Calendar.DAY_OF_WEEK);// 星期表示1-7，是从星期日开始，
             mapD.put(i, str[number - 1]);
-            sql = "update extraction1 set commit_day=\" " + str[number - 1]
+            sql = "update hunk1 set commit_day=\" " + str[number - 1]
                     + "\" where commit_id=" + i;
             stmt.executeUpdate(sql);
         }
     }
 
     /**
-     * 获取提交的时间，以小时标示。如果excuteAll为真,则获取extraction1中所有数据的时间.
+     * 获取提交的时间，以小时标示。如果excuteAll为真,则获取hunk1中所有数据的时间.
      * 否则只获取commit_id在commitIdPart中的数据的时间.
      *
      * @throws NumberFormatException
@@ -1248,6 +1249,14 @@ public final class ExtractionMeta extends Extraction {
                 System.out.println("Error! " + key.get(0) + " " + key.get(1));
             }
         }
+    }
+
+    public static String getDatabaseName() {
+        return databaseName;
+    }
+
+    public static void setDatabaseName(String databaseName) {
+        ExtractionMeta.databaseName = databaseName;
     }
 
     public static void main(String[] args) throws Exception {
