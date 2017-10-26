@@ -23,17 +23,17 @@ import java.util.Map;
  * @see Statement
  */
 public abstract class Extraction {
-    private String sql;
-    private Statement stmt;
-    private ResultSet resultSet;
-    private int start;
-    private int end;
-    private List<List<Integer>> commit_fileIds;
-    private List<Integer> commit_ids;
-    private List<Integer> commitIdPart;
-    private SQLConnection sqlL;
-    private String databaseName;
-    private static String logFileName = "changeHunkLog";
+    String sql;
+    Statement stmt;
+    ResultSet resultSet;
+    int start;
+    int end;
+    List<List<Integer>> commit_fileIds;
+    List<Integer> commit_ids;
+    List<Integer> commitIdPart;
+    SQLConnection sqlL;
+    String databaseName;
+    static String logFileName = "changeHunkLog";
 
 
     public Extraction(String database, int start, int end) throws Exception {
