@@ -17,31 +17,26 @@ import java.util.Map;
  * 由三个子类去实现。需要注意的是，由于miningit分配给各commit的id并不是其实际提交的
  * 顺序（由于多线程并发导致），所以对于commit的排序不应根据其id排序，而应根据 commit_date排序。
  *
+ * @author niu
  * @see ResultSet
  * @see SQLException
  * @see Statement
- * @author niu
- *
  */
 public abstract class Extraction {
-    String sql;
-    Statement stmt;
-    ResultSet resultSet;
-    int start;
-    int end;
-    List<List<Integer>> commit_fileIds;
-    List<Integer> commit_ids;
-    List<Integer> commitIdPart;
-    SQLConnection sqlL;
-    String databaseName;
+    private String sql;
+    private Statement stmt;
+    private ResultSet resultSet;
+    private int start;
+    private int end;
+    private List<List<Integer>> commit_fileIds;
+    private List<Integer> commit_ids;
+    private List<Integer> commitIdPart;
+    private SQLConnection sqlL;
+    private String databaseName;
+    private static String logFileName = "changeHunkLog";
 
-    /**
-     * extraction2提取信息并不需要miningit生成的数据，此构造函数只是为了统一接口。
-     *
-     * @param database
-     * @throws Exception
-     */
-    public Extraction(String database, int start, int end) throws Exception { // 为extraction2提供构造函数。
+
+    public Extraction(String database, int start, int end) throws Exception {
         this.start = start;
         this.end = end;
         this.databaseName = database;
@@ -58,7 +53,7 @@ public abstract class Extraction {
     private void initialCommitFileIds() throws Exception {
         commit_ids = new ArrayList<>();
         commitIdPart = new ArrayList<>();
-        commit_fileIds=new ArrayList<>();
+        commit_fileIds = new ArrayList<>();
         sql = "select id from scmlog order by commit_date";
         resultSet = stmt.executeQuery(sql);
         while (resultSet.next()) {
@@ -88,13 +83,13 @@ public abstract class Extraction {
             }
         }
 
-        File logFile=new File("log");
+        File logFile = new File(logFileName);
         if (!logFile.exists()) {
             logFile.createNewFile();
         }
-        BufferedWriter bWriter=new BufferedWriter(new FileWriter(logFile));
+        BufferedWriter bWriter = new BufferedWriter(new FileWriter(logFile));
         for (List<Integer> list : commit_fileIds) {
-            bWriter.append(list.get(0)+" "+list.get(1)+"\n");
+            bWriter.append(list.get(0) + " " + list.get(1) + "\n");
         }
         bWriter.flush();
         bWriter.close();
