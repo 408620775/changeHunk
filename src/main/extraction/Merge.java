@@ -1,4 +1,4 @@
-package main.extraction;
+package src.main.extraction;
 
 import java.util.LinkedHashMap;
 import java.util.List;

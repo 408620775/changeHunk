@@ -1,4 +1,4 @@
-package main.exception;
+package src.main.exception;
 
 public class InsExistenceException extends Exception{
 

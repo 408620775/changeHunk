@@ -1,4 +1,4 @@
-package main.extraction;
+package src.main.extraction;
 
 import java.util.HashMap;
 import java.util.Map;

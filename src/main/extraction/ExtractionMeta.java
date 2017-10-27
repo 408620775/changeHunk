@@ -1,6 +1,6 @@
-package main.extraction;
+package src.main.extraction;
 
-import main.exception.InsExistenceException;
+import src.main.exception.InsExistenceException;
 
 import java.io.*;
 import java.sql.SQLException;
@@ -19,8 +19,8 @@ import java.util.Map.Entry;
 public final class ExtractionMeta extends Extraction {
     private List<String> curAttributes;
     private List<List<Integer>> commit_file_inExtracion1;
-    private static String databaseName = "hunk1";
-    private static String databaseNameKey = "databaseName";
+    public static String metaTableName = "hunk1";
+    public static String metaTableNamekey = "MetaTable";
 
 
     /**
@@ -40,8 +40,8 @@ public final class ExtractionMeta extends Extraction {
         File propertyFile = new File(propertyFilePath);
         FileReader fReader = new FileReader(propertyFile);
         properties.load(fReader);
-        if (properties.containsKey(databaseNameKey)){
-            databaseName = properties.getProperty(databaseNameKey);
+        if (properties.containsKey(metaTableNamekey)){
+            metaTableName = properties.getProperty(metaTableNamekey);
         }
     }
 
@@ -1249,14 +1249,6 @@ public final class ExtractionMeta extends Extraction {
                 System.out.println("Error! " + key.get(0) + " " + key.get(1));
             }
         }
-    }
-
-    public static String getDatabaseName() {
-        return databaseName;
-    }
-
-    public static void setDatabaseName(String databaseName) {
-        ExtractionMeta.databaseName = databaseName;
     }
 
     public static void main(String[] args) throws Exception {
