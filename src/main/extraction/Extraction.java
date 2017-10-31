@@ -1,6 +1,7 @@
 package src.main.extraction;
 
 import org.apache.log4j.Logger;
+
 import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -34,18 +35,13 @@ public abstract class Extraction {
     SQLConnection sqlL;
     String databaseName;
 
-    public Extraction(String database, int start, int end) {
+    public Extraction(String database, int start, int end) throws IOException, SQLException {
         this.start = start;
         this.end = end;
         this.databaseName = database;
         this.sqlL = new SQLConnection(database);
         this.stmt = sqlL.getStmt();
-        try {
-            initialCommitFileIds();
-        } catch (Exception e) {
-
-        }
-
+        initialCommitFileIds();
     }
 
     /**
@@ -63,9 +59,11 @@ public abstract class Extraction {
             commit_ids.add(resultSet.getInt(1));
         }
         if (start < 0) {
+            logger.error("start commit_id can't be less 0!");
             throw new IllegalArgumentException("start commit_id can't be less 0!");
         }
         if (end > commit_ids.size()) {
+            logger.error("end is larger than the total number of commits!");
             throw new IllegalArgumentException(
                     "end is larger than the total number of commits!");
         }
@@ -90,7 +88,7 @@ public abstract class Extraction {
         StringBuilder sBuilder = new StringBuilder();
         for (int i = 0; i < commit_fileIds.size(); i++) {
             sBuilder.append("[" + commit_fileIds.get(i).get(0) + "," + commit_fileIds.get(i).get(1) + "] ");
-            if (i % 9 == 0) {
+            if (i % 9 == 0 && i != 0) {
                 logger.info(sBuilder);
                 sBuilder = new StringBuilder();
             }
