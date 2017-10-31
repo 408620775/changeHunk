@@ -1,13 +1,8 @@
 package src.main.extraction;
 
 import org.apache.log4j.Logger;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.ResultSet;
-import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
