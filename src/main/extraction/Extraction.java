@@ -1,9 +1,13 @@
 package src.main.extraction;
 
+import org.apache.log4j.Logger;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.sql.ResultSet;
+import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -23,6 +27,7 @@ import java.util.Map;
  * @see Statement
  */
 public abstract class Extraction {
+    private static Logger logger = Logger.getLogger(ExtractionMeta.class);
     String sql;
     Statement stmt;
     ResultSet resultSet;
@@ -33,16 +38,19 @@ public abstract class Extraction {
     List<Integer> commitIdPart;
     SQLConnection sqlL;
     String databaseName;
-    static String logFileName = "changeHunkLog";
 
-
-    public Extraction(String database, int start, int end) throws Exception {
+    public Extraction(String database, int start, int end) {
         this.start = start;
         this.end = end;
         this.databaseName = database;
         this.sqlL = new SQLConnection(database);
         this.stmt = sqlL.getStmt();
-        initialCommitFileIds();
+        try {
+            initialCommitFileIds();
+        } catch (Exception e) {
+
+        }
+
     }
 
     /**
@@ -50,7 +58,7 @@ public abstract class Extraction {
      *
      * @throws Exception
      */
-    private void initialCommitFileIds() throws Exception {
+    private void initialCommitFileIds() throws IllegalArgumentException, SQLException, IOException {
         commit_ids = new ArrayList<>();
         commitIdPart = new ArrayList<>();
         commit_fileIds = new ArrayList<>();
@@ -60,10 +68,10 @@ public abstract class Extraction {
             commit_ids.add(resultSet.getInt(1));
         }
         if (start < 0) {
-            throw new Exception("start can't be less 0!");
+            throw new IllegalArgumentException("start commit_id can't be less 0!");
         }
         if (end > commit_ids.size()) {
-            throw new Exception(
+            throw new IllegalArgumentException(
                     "end is larger than the total number of commits!");
         }
         for (int i = start - 1; i < end; i++) {
@@ -83,16 +91,15 @@ public abstract class Extraction {
             }
         }
 
-        File logFile = new File(logFileName);
-        if (!logFile.exists()) {
-            logFile.createNewFile();
+        logger.info("commit_fileIds are :");
+        StringBuilder sBuilder = new StringBuilder();
+        for (int i = 0; i < commit_fileIds.size(); i++) {
+            sBuilder.append("[" + commit_fileIds.get(i).get(0) + "," + commit_fileIds.get(i).get(1) + "] ");
+            if (i % 9 == 0) {
+                logger.info(sBuilder);
+                sBuilder = new StringBuilder();
+            }
         }
-        BufferedWriter bWriter = new BufferedWriter(new FileWriter(logFile));
-        for (List<Integer> list : commit_fileIds) {
-            bWriter.append(list.get(0) + " " + list.get(1) + "\n");
-        }
-        bWriter.flush();
-        bWriter.close();
     }
 
     /**

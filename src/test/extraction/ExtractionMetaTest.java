@@ -23,21 +23,21 @@ public class ExtractionMetaTest {
 
     @Test
     public void loadProperty() throws Exception {
-        String logFileName = "log";
-        String logContent = " MetaTable = metaHunk";
-        File logFile = new File(logFileName);
-        if (logFile.exists()) {
-            logFile.delete();
+        String propertyFileName = "test.property";
+        String propertyContent = " MetaTable = metaHunk";
+        File propertyFile = new File(propertyFileName);
+        if (propertyFile.exists()) {
+            propertyFile.delete();
         }
-        logFile.createNewFile();
-        BufferedWriter bWriter = new BufferedWriter(new FileWriter(logFile));
-        bWriter.append(logContent);
+        propertyFile.createNewFile();
+        BufferedWriter bWriter = new BufferedWriter(new FileWriter(propertyFile));
+        bWriter.append(propertyContent);
         bWriter.flush();
         bWriter.close();
         ExtractionMeta meta = new ExtractionMeta("MyVoldemort", 501, 800);
-        meta.loadProperty(logFileName);
-        Assert.assertEquals(meta.metaTableName, logContent.split("=")[1].trim());
-        logFile.delete();
+        meta.loadProperty(propertyFileName);
+        Assert.assertEquals(meta.metaTableName, propertyContent.split("=")[1].trim());
+        propertyFile.delete();
     }
 
 }

@@ -1,5 +1,6 @@
 package src.main.extraction;
 
+import org.apache.log4j.Logger;
 import src.main.exception.InsExistenceException;
 
 import java.io.*;
@@ -17,6 +18,7 @@ import java.util.Map.Entry;
  * @author niu
  */
 public final class ExtractionMeta extends Extraction {
+    private static Logger logger = Logger.getLogger(ExtractionMeta.class);
     private List<String> curAttributes;
     private List<List<Integer>> commit_file_inExtracion1;
     public static String metaTableName = "hunk1";
@@ -35,6 +37,11 @@ public final class ExtractionMeta extends Extraction {
         super(database, s, e);
     }
 
+    /**
+     * 加载配置文件中的相关设置,用于1.定义mataTable名称.
+     * @param propertyFilePath
+     * @throws IOException
+     */
     public void loadProperty(String propertyFilePath) throws IOException {
         Properties properties = new Properties();
         File propertyFile = new File(propertyFilePath);
@@ -43,18 +50,25 @@ public final class ExtractionMeta extends Extraction {
         if (properties.containsKey(metaTableNamekey)){
             metaTableName = properties.getProperty(metaTableNamekey);
         }
+        logger.info("load database properties success!");
     }
 
     /**
-     * extraction1表中必须通过执行所有的实例才能获取的信息.
-     *
-     * @throws Exception
+     * 生成mataTable表,并将相关数据填入表中.
      */
-    public void mustTotal() throws Exception {
+    public void getMetaTableData() throws Exception {
         CreateTable();
         initial();
         bug_introducing();
         cumulative_bug_count();
+    }
+    /**
+     * mataTable表中必须通过执行所有的实例才能获取的信息.
+     *
+     * @throws Exception
+     */
+    public void mustTotal() throws Exception {
+
     }
 
     public SQLConnection getConnection() {
@@ -83,8 +97,8 @@ public final class ExtractionMeta extends Extraction {
      * @throws SQLException
      */
     public void CreateTable() throws SQLException {
-        sql = "create table meta(id int(11) primary key not null auto_increment,commit_id int(11),file_id int(11),"
-                + "hunk_id int(11), author_name varchar(40),commit_day varchar(15),commit_hour int(2),"
+        sql = "create table "+metaTableName+"(id int(11) primary key not null auto_increment,commit_id int(11),"
+                + "file_id int(11), hunk_id int(11), author_name varchar(40),commit_day varchar(15),commit_hour int(2),"
                 + "cumulative_change_count int(15) default 0,cumulative_bug_count int(15) default 0,"
                 + "change_log_length int(5),changed_LOC int(7),"
                 + "sloc int(7),bug_introducing tinyint(1) default 0)";
@@ -101,28 +115,33 @@ public final class ExtractionMeta extends Extraction {
      *
      * @throws SQLException
      */
-    public void initial() throws SQLException {
+
+    public void initial() {
         System.out.println("initial the table");
         for (Integer integer : commit_ids) {
             sql = "select commit_id,file_id,current_file_path from actions where commit_id="
                     + integer + " and type!='D'"; // 只选取java文件,同时排除测试文件。
-            resultSet = stmt.executeQuery(sql);
-            List<List<Integer>> list = new ArrayList<>();
-            while (resultSet.next()) {
-                if (resultSet.getString(3).endsWith(".java")
-                        && (!resultSet.getString(3).toLowerCase()
-                        .contains("test"))) {
-                    List<Integer> temp = new ArrayList<>();
-                    temp.add(resultSet.getInt(1));
-                    temp.add(resultSet.getInt(2));
-                    list.add(temp);
+            try {
+                resultSet = stmt.executeQuery(sql);
+                List<List<Integer>> list = new ArrayList<>();
+                while (resultSet.next()) {
+                    if (resultSet.getString(3).endsWith(".java")
+                            && (!resultSet.getString(3).toLowerCase()
+                            .contains("test"))) {
+                        List<Integer> temp = new ArrayList<>();
+                        temp.add(resultSet.getInt(1));
+                        temp.add(resultSet.getInt(2));
+                        list.add(temp);
+                    }
                 }
-            }
 
-            for (List<Integer> list2 : list) {
-                sql = "insert hunk1 (commit_id,file_id) values("
-                        + list2.get(0) + "," + list2.get(1) + ")";
-                stmt.executeUpdate(sql);
+                for (List<Integer> list2 : list) {
+                    sql = "insert hunk1 (commit_id,file_id) values("
+                            + list2.get(0) + "," + list2.get(1) + ")";
+                    stmt.executeUpdate(sql);
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
             }
         }
     }
