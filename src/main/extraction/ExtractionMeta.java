@@ -512,8 +512,7 @@ public final class ExtractionMeta extends Extraction {
     }
 
     /**
-     * 根据论文A Large-Scale Empirical Study Of Just-in-Time Quality
-     * Assurance,增加分类实例的某些属性
+     * 根据论文A Large-Scale Empirical Study Of Just-in-Time Quality Assurance,增加分类实例的某些属性
      * .history属性的实现中,首先用到的是之前根据文件名或者file_id回找一个文件的历史记录,对于于history1
      * ()的实现.后来发现可以根据gitlog来更加准确的获取文件的历史改变记录
      * ,对应于histor2()的实现,history2()调用resource中的history.py
@@ -764,7 +763,7 @@ public final class ExtractionMeta extends Extraction {
             InterruptedException {
         System.out.println("Update history With Python");
         String command = "python " + System.getProperty("user.dir")
-                + "/src/pers/bbn/changeBug/resources/history.py -d "
+                + "/src/pers/bbn/changeBug/scripts/history.py -d "
                 + databaseName + " -s " + start + " -e " + end + " -g "
                 + gitFile;
         System.out.println(command);
@@ -781,83 +780,6 @@ public final class ExtractionMeta extends Extraction {
             System.out.println(line);
         }
         pythonProcess.waitFor();
-    }
-
-    /**
-     * 根据论文A Large-Scale Empirical Study Of Just-in-Time Quality
-     * Assurance,增加分类实例的历史信息,包括NDEV,AGE,NUC三部分,具体含义见论文.
-     *
-     * @throws SQLException
-     * @throws ParseException
-     */
-
-    @SuppressWarnings("unused")
-    private void history1() throws SQLException, ParseException {
-        System.out.println("Update history");
-        if (curAttributes == null) {
-            obtainCurAttributes();
-        }
-        if (!curAttributes.contains("NEDV")) {
-            sql = "ALTER TABLE extraction1 ADD (NEDV int,AGE long,NUC int)";
-            stmt.executeUpdate(sql);
-            curAttributes.add("NEDV");
-            curAttributes.add("AGE");
-            curAttributes.add("NUC");
-        }
-        if (commit_file_inExtracion1 == null) {
-            obtainCFidInExtraction1();
-        }
-        for (List<Integer> commit_fileIdList : commit_file_inExtracion1) {
-            updateHistory(commit_fileIdList.get(0), commit_fileIdList.get(1));
-        }
-    }
-
-    /**
-     * 针对给定的commitId,fileId对,update其在extraction1表中的history属性.
-     * 实现已经在history.py中实现了,其上层函数history1已经暂时废弃.
-     *
-     * @param curCommitId
-     * @param curFileId
-     * @throws SQLException
-     * @throws ParseException
-     */
-    private void updateHistory(Integer curCommitId, Integer curFileId)
-            throws SQLException, ParseException {
-
-        int firstAddCommitId = getFirstAppearOfFile(curCommitId, curFileId)
-                .get(0);
-        List<String> timeRange = getTimeRangeBetweenTwoCommit(firstAddCommitId,
-                curCommitId);
-        String startTime = timeRange.get(0);
-        String endTime = timeRange.get(1);
-        int lastCommitId = getLastChangeOfFile(curCommitId, curFileId);
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        sql = "select commit_date from scmlog where id=" + lastCommitId;
-        resultSet = stmt.executeQuery(sql);
-        String lastTime = null;
-        while (resultSet.next()) {
-            lastTime = resultSet.getString(1);
-        }
-        java.util.Date lt = sdf.parse(lastTime);
-        java.util.Date et = sdf.parse(endTime);
-        long seconds = (et.getTime() - lt.getTime()) / 1000;
-        sql = "select author_id from actions,scmlog where file_id=" + curFileId
-                + " and scmlog.id=actions.commit_id and commit_date between '"
-                + startTime + "' and '" + endTime + "'";
-        resultSet = stmt.executeQuery(sql);
-        int count = 0;
-        Set<Integer> author_id = new HashSet<>();
-        while (resultSet.next()) {
-            count++;
-            author_id.add(resultSet.getInt(1));
-        }
-        int nedv = author_id.size();
-        long age = seconds;
-        int nuc = count;
-        sql = "update extraction1 set NEDV=" + nedv + ",AGE=" + age + ",NUC="
-                + nuc + " where commit_id=" + curCommitId + " and file_id="
-                + curFileId;
-        stmt.executeUpdate(sql);
     }
 
     /**
@@ -1002,112 +924,6 @@ public final class ExtractionMeta extends Extraction {
             obtainCFidInExtraction1();
         }
         return commit_file_inExtracion1;
-    }
-
-    /**
-     * 根据论文A Large-Scale Empirical Study Of Just-in-Time Quality
-     * Assurance,增加分类实例的作者经验信息,包括EXP,REXP,SEXP三部分,具体含义见论文. 已在history.py中实现,暂时废弃.
-     *
-     * @throws SQLException
-     */
-    @SuppressWarnings("unused")
-    private void experience() throws SQLException {
-        System.out.println("Update Experience");
-        if (curAttributes == null) {
-            obtainCurAttributes();
-        }
-        if (!curAttributes.contains("EXP")) {
-            sql = "ALTER TABLE extraction1 ADD (EXP int,REXP float,SEXP int)";
-            stmt.executeUpdate(sql);
-            curAttributes.add("EXP");
-            curAttributes.add("REXP");
-            curAttributes.add("SEXP");
-        }
-        if (commit_file_inExtracion1 == null) {
-            obtainCFidInExtraction1();
-        }
-        for (List<Integer> list : commit_file_inExtracion1) {
-            updateExperience(list.get(0), list.get(1));
-        }
-    }
-
-    /**
-     * 针对给定的commitId,fileId,update该实例的作者experience.目前experience表示,自fileId文件创建以来,
-     * commitId对应的作者总共更改过多少次fileId文件(不包括当前的change,因为要预测当前是否引入缺陷)
-     * .rexp标示根据时间距离现今的长短对rexp进行加权,时间单位为年.sexp为该作者对于当前子系统做过多少次更改.
-     * 真正进行测试的时候发现exp和rexp的值基本一致,这是因为很少选定的范围内commit跨越了年.
-     *
-     * @param commitId
-     * @param fileId
-     * @throws SQLException
-     */
-    // 其上层函数已经被废弃,暂时没用了.好像还有点问题这个函数.
-    private void updateExperience(int commitId, int fileId) throws SQLException {
-        int firstAppearCommitId = getFirstAppearOfFile(commitId, fileId).get(0);
-        List<String> timeRange = getTimeRangeBetweenTwoCommit(
-                firstAppearCommitId, commitId);
-        String startTime = timeRange.get(0);
-        String endTime = timeRange.get(1);
-        int exp = 0;
-        float rexp = 0f;
-        int sexp = 0;
-        int curAuthor_id = 0;
-        String curFilePath = null;
-        sql = "select author_id,current_file_path from scmlog,actions where scmlog.id=actions.commit_id and scmlog.id="
-                + commitId + " and file_id=" + fileId;
-        resultSet = stmt.executeQuery(sql);
-        while (resultSet.next()) {
-            curAuthor_id = resultSet.getInt(1);
-            curFilePath = resultSet.getString(2);
-        }
-        sql = "select commit_date from extraction1,scmlog where extraction1.commit_id=scmlog.id and commit_date between '"
-                + startTime
-                + "' and '"
-                + endTime
-                + "' and author_id="
-                + curAuthor_id + " and file_id=" + fileId;
-        resultSet = stmt.executeQuery(sql);
-        List<String> datesList = new ArrayList<>();
-        while (resultSet.next()) {
-            datesList.add(resultSet.getString(1));
-        }
-        exp = datesList.size() - 1;
-        if (datesList.size() == 1) {
-            exp = 0;
-        }
-        rexp = changeWeightedByYear(datesList);
-
-        if (!curFilePath.contains("/")) {
-            System.out.println("cur file not in ang subsystem!");
-        } else {
-            String subsystem = curFilePath.split("/")[0];
-            int count = 0;
-            int curIdInExtraction1 = 0;
-            sql = "select id from extraction1 where commit_id=" + commitId
-                    + " and file_id=" + fileId;
-            resultSet = stmt.executeQuery(sql);
-            while (resultSet.next()) {
-                curIdInExtraction1 = resultSet.getInt(1);
-            }
-            sql = "select current_file_path from extraction1,actions,scmlog where extraction1.id<"
-                    + curIdInExtraction1
-                    + " and extraction1.commit_id=actions.commit_id and extraction1.file_id=actions.file_id"
-                    + " and actions.commit_id="
-                    + "scmlog.id and author_id="
-                    + curAuthor_id;
-            resultSet = stmt.executeQuery(sql);
-            while (resultSet.next()) {
-                String lastFilePath = resultSet.getString(1);
-                if (lastFilePath.split("/")[0].equals(subsystem)) {
-                    count++;
-                }
-            }
-            sexp = count;
-        }
-
-        sql = "update extraction1 set EXP=" + exp + ",REXP=" + rexp + ",SEXP="
-                + sexp;
-        stmt.executeUpdate(sql);
     }
 
     /**
