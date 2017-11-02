@@ -2,6 +2,7 @@ package src.main.extraction;
 
 import org.apache.log4j.Logger;
 import src.main.exception.InsExistenceException;
+
 import java.io.*;
 import java.sql.SQLException;
 import java.text.ParseException;
@@ -20,7 +21,8 @@ public final class ExtractionMeta extends Extraction {
     private static Logger logger = Logger.getLogger(ExtractionMeta.class);
     private List<String> curAttributes;
     private List<List<Integer>> commit_file_inExtracion1;
-    public static String metaTableName = "hunk1";
+    private String message;
+    public static String metaTableName = "metaHunk";
     public static String metaTableNamekey = "MetaTable";
 
 
@@ -38,6 +40,7 @@ public final class ExtractionMeta extends Extraction {
 
     /**
      * 加载配置文件中的相关设置,用于1.定义mataTable名称.
+     *
      * @param propertyFilePath
      * @throws IOException
      */
@@ -46,7 +49,7 @@ public final class ExtractionMeta extends Extraction {
         File propertyFile = new File(propertyFilePath);
         FileReader fReader = new FileReader(propertyFile);
         properties.load(fReader);
-        if (properties.containsKey(metaTableNamekey)){
+        if (properties.containsKey(metaTableNamekey)) {
             metaTableName = properties.getProperty(metaTableNamekey);
         }
         logger.info("load database properties success!");
@@ -59,27 +62,7 @@ public final class ExtractionMeta extends Extraction {
         CreateTable();
         initial();
         bug_introducing();
-        cumulative_bug_count();
-    }
-    /**
-     * mataTable表中必须通过执行所有的实例才能获取的信息.
-     *
-     * @throws Exception
-     */
-    public void mustTotal() throws Exception {
-
-    }
-
-    public SQLConnection getConnection() {
-        return sqlL;
-    }
-
-    /**
-     * hunk1表中可以选择一部分一部分执行的信息.
-     *
-     * @throws Exception
-     */
-    public void canPart() throws Exception {
+        cumulative_bug_count();  //
         author_name(false);
         commit_day(false);
         commit_hour(false);
@@ -87,66 +70,74 @@ public final class ExtractionMeta extends Extraction {
         changed_LOC(false);
     }
 
+    public SQLConnection getConnection() {
+        return sqlL;
+    }
+
     /**
-     * 创建数据表hunk1。 若构造函数中所连接的数据库中已经存在hunk1表，则会产生冲突。
-     * 解决方案有2：（1）若之前的hunk1为本程序生成的表，则可将其卸载。
-     * （2）若之前的hunk1为用户自己的表，则可考虑备份原表的数据，并删除原表（建议），
-     * 或者重命名本程序中的hunk1的名称（不建议）。
+     * 创建数据表。 若构造函数中所连接的数据库中已经存在该表，则会产生冲突。
+     * 解决方案有2：（1）若之前的表为本程序生成的表，则可将其卸载。
+     * （2）若之前的表为用户自己的私有的，则可考虑备份原表的数据，并删除原表（建议），
+     * 或者重命名本程序中的metaTable的名称（不建议）。
      *
      * @throws SQLException
      */
     public void CreateTable() throws SQLException {
-        sql = "create table "+metaTableName+"(id int(11) primary key not null auto_increment,commit_id int(11),"
+        sql = "create table " + metaTableName + "(id int(11) primary key not null auto_increment,commit_id int(11),"
                 + "file_id int(11), hunk_id int(11), author_name varchar(40),commit_day varchar(15),commit_hour int(2),"
                 + "cumulative_change_count int(15) default 0,cumulative_bug_count int(15) default 0,"
                 + "change_log_length int(5),changed_LOC int(7),"
                 + "sloc int(7),bug_introducing tinyint(1) default 0)";
         int result = stmt.executeUpdate(sql);
         if (result != -1) {
-            System.out.println("创建表meta成功");
+            message = "Create mateTable successfully.";
+            System.out.println(message);
+            logger.info(message);
+        } else {
+            message = "Failed to create mateTable.";
+            System.out.println(message);
+            logger.error(message);
         }
     }
 
     /**
-     * 初始化表格。 根据指定范围内的按时间排序的commit列表（commit_ids）初始化hunk1。
-     * 初始化内容包括id，commit_id，file_id。需要注意的是，目前只考虑java文件，且不考虑java中的测试文件
-     * 所以在actions表中选择对应的项时需要进行过滤。由于SZZ算法需要回溯,所以在初始化hunk1表的时候需要考虑所有actions.
+     * 初始化表格。 根据指定范围内的按时间排序的commit列表（commit_ids）初始化metaTable。
+     * 初始化内容包括id，commit_id，file_id,hunk_id。需要注意的是，目前只考虑java文件，且不考虑java中的测试文件
+     * 所以在actions表中选择对应的项时需要进行过滤。由于SZZ算法需要回溯,所以在初始化metaTable表的时候需要考虑所有actions.
      *
      * @throws SQLException
      */
 
-    public void initial() {
+    public void initial() throws SQLException {
         System.out.println("initial the table");
         for (Integer integer : commit_ids) {
-            sql = "select commit_id,file_id,current_file_path from actions where commit_id="
-                    + integer + " and type!='D'"; // 只选取java文件,同时排除测试文件。
-            try {
-                resultSet = stmt.executeQuery(sql);
-                List<List<Integer>> list = new ArrayList<>();
-                while (resultSet.next()) {
-                    if (resultSet.getString(3).endsWith(".java")
-                            && (!resultSet.getString(3).toLowerCase()
-                            .contains("test"))) {
-                        List<Integer> temp = new ArrayList<>();
-                        temp.add(resultSet.getInt(1));
-                        temp.add(resultSet.getInt(2));
-                        list.add(temp);
-                    }
-                }
+            sql = "select hunks.commit_id,hunks.file_id,hunks.id,current_file_path from actions,hunks where " +
+                    "hunks.commit_id = " + integer + " and hunks.commit_id = actions.commit_id and hunks" +
+                    ".file_id=actions.file_id and type!='D'"; // 只选取java文件,同时排除测试文件。
 
-                for (List<Integer> list2 : list) {
-                    sql = "insert hunk1 (commit_id,file_id) values("
-                            + list2.get(0) + "," + list2.get(1) + ")";
-                    stmt.executeUpdate(sql);
+            resultSet = stmt.executeQuery(sql);
+            List<List<Integer>> list = new ArrayList<>();
+            while (resultSet.next()) {
+                if (resultSet.getString(4).endsWith(".java")
+                        && (!resultSet.getString(4).toLowerCase()
+                        .contains("test"))) {
+                    List<Integer> temp = new ArrayList<>();
+                    temp.add(resultSet.getInt(1));
+                    temp.add(resultSet.getInt(2));
+                    temp.add(resultSet.getInt(3));
+                    list.add(temp);
                 }
-            } catch (SQLException e) {
-                e.printStackTrace();
+            }
+            for (List<Integer> list2 : list) {
+                sql = "insert metaTable (commit_id,file_id,hunk_id) values("
+                        + list2.get(0) + "," + list2.get(1) + "," + list2.get(2) + ")";
+                stmt.executeUpdate(sql);
             }
         }
     }
 
     /**
-     * 查看当前hunk1表中所有已存在的属性,对外的接口.
+     * 查看当前metaTable表中所有已存在的属性,对外的接口.
      *
      * @return
      * @throws SQLException
@@ -159,14 +150,14 @@ public final class ExtractionMeta extends Extraction {
     }
 
     /**
-     * 将hunk1表中现有的属性填入curAttributes.
+     * 将metaTable表中现有的属性填入curAttributes.
      *
      * @throws SQLException
      */
     private void obtainCurAttributes() throws SQLException {
         if (curAttributes == null) {
             curAttributes = new ArrayList<>();
-            sql = "desc hunk1";
+            sql = "desc metaTable";
             resultSet = stmt.executeQuery(sql);
             while (resultSet.next()) {
                 curAttributes.add(resultSet.getString(1));
@@ -175,7 +166,7 @@ public final class ExtractionMeta extends Extraction {
     }
 
     /**
-     * 获取作者姓名。如果excuteAll为真,则获取hunk1中所有数据的作者.
+     * 获取作者姓名。如果excuteAll为真,则获取metaTable中所有数据的作者.
      * 否则只获取commit_id在commitIdPart中的数据的作者.
      *
      * @throws SQLException
@@ -189,16 +180,15 @@ public final class ExtractionMeta extends Extraction {
         }
         System.out.println("get author_name");
         for (Integer integer : excuteList) {
-            sql = "update hunk1,scmlog,people set hunk1.author_name=people.name where hunk1.commit_id="
-                    + integer
-                    + " and hunk1.commit_id="
-                    + "scmlog.id and scmlog.author_id=people.id";
+            sql = "update " + metaTableName + ",scmlog,people set " + metaTableName + ".author_name=people.name where "
+                    + metaTableName + ".commit_id=" + integer + " and " + metaTableName + ".commit_id=scmlog.id and "
+                    + "scmlog.author_id=people.id";
             stmt.executeUpdate(sql);
         }
     }
 
     /**
-     * 获取提交的日期，以星期标示。如果excuteAll为真,则获取hunk1中所有数据的日期.
+     * 获取提交的日期，以星期标示。如果excuteAll为真,则获取metaTable中所有数据的日期.
      * 否则只获取commit_id在commitIdPart中的数据的日期.
      *
      * @throws SQLException
@@ -233,14 +223,14 @@ public final class ExtractionMeta extends Extraction {
             calendar.set(year, month - 1, day);// 设置当前时间,月份是从0月开始计算
             int number = calendar.get(Calendar.DAY_OF_WEEK);// 星期表示1-7，是从星期日开始，
             mapD.put(i, str[number - 1]);
-            sql = "update hunk1 set commit_day=\" " + str[number - 1]
+            sql = "update " + metaTableName + " set commit_day=\" " + str[number - 1]
                     + "\" where commit_id=" + i;
             stmt.executeUpdate(sql);
         }
     }
 
     /**
-     * 获取提交的时间，以小时标示。如果excuteAll为真,则获取hunk1中所有数据的时间.
+     * 获取提交的时间，以小时标示。如果excuteAll为真,则获取metaTable中所有数据的时间.
      * 否则只获取commit_id在commitIdPart中的数据的时间.
      *
      * @throws NumberFormatException
@@ -270,7 +260,7 @@ public final class ExtractionMeta extends Extraction {
             Entry<Integer, Integer> e = iter.next();
             int key = e.getKey();
             int value = e.getValue();
-            sql = "update  extraction1 set commit_hour=" + value
+            sql = "update  " + metaTableName + " set commit_hour=" + value
                     + "  where commit_id=" + key;
             stmt.executeUpdate(sql);
         }
@@ -297,7 +287,7 @@ public final class ExtractionMeta extends Extraction {
             while (resultSet.next()) {
                 message = resultSet.getString(1);
             }
-            sql = "update extraction1 set change_log_length ="
+            sql = "update " + metaTableName + " set change_log_length ="
                     + message.length() + " where commit_id=" + integer;
             stmt.executeUpdate(sql);
         }
@@ -447,22 +437,19 @@ public final class ExtractionMeta extends Extraction {
         } else {
             excuteList = commitIdPart;
         }
-        List<List<Integer>> re = new ArrayList<>();
+        List<Integer> hunk_ids = new ArrayList<>();
         for (Integer integer : excuteList) {
-            sql = "select id,file_id from extraction1 where commit_id="
+            sql = "select hunk_id from " + metaTableName + " where commit_id="
                     + integer;
             resultSet = stmt.executeQuery(sql);
             while (resultSet.next()) {
-                List<Integer> temp = new ArrayList<>();
-                temp.add(resultSet.getInt(1));
-                temp.add(integer);
-                temp.add(resultSet.getInt(2));
-                re.add(temp);
+                int hunk_id = resultSet.getInt(1);
+                hunk_ids.add(hunk_id);
             }
         }
-        for (List<Integer> list : re) {
-            sql = "select old_start_line,old_end_line,new_start_line,new_end_line from hunks where commit_id="
-                    + list.get(1) + " and file_id=" + list.get(2);
+        for (Integer hunk_id : hunk_ids) {
+            sql = "select old_start_line,old_end_line,new_start_line,new_end_line from hunks where id="
+                    + hunk_id;
             resultSet = stmt.executeQuery(sql);
             int changeLoc = 0;
             while (resultSet.next()) {
@@ -475,8 +462,8 @@ public final class ExtractionMeta extends Extraction {
                             - resultSet.getInt(3) + 1;
                 }
             }
-            sql = "update extraction1 set changed_LOC=" + changeLoc
-                    + " where id=" + list.get(0);
+            sql = "update " + metaTableName + " set changed_LOC=" + changeLoc
+                    + " where hunk_id=" + hunk_id;
             stmt.executeUpdate(sql); // 这个信息，似乎在extraction2中的detal计算时已经包含了啊。
         }
     }
@@ -489,20 +476,38 @@ public final class ExtractionMeta extends Extraction {
      */
     public void bug_introducing() throws SQLException {
         System.out.println("get bug introducing");
-        sql = "select hunks.id,file_name from hunks,files,"
-                + "(select commit_id as c,file_id as f from extraction1,scmlog where extraction1.commit_id=scmlog.id and is_bug_fix=1) as tb "
-                + "where hunks.commit_id=tb.c and hunks.file_id=tb.f and hunks.file_id=files.id;";
+        sql = "select " + metaTableName + ".commit_id," + metaTableName + ".file_id,hunk_id,old_start_line,old_end_line,"
+                + " from " + metaTableName + ",scmlog,hunks where " + metaTableName
+                + ".commit_id=scmlog.id and is_bug_fix=1 and hunk_id=hunks.id";
         resultSet = stmt.executeQuery(sql);
-        Map<Integer, String> fId_name = new HashMap<>();
+        List<List<Integer>> bugFixFileHunkIds = new ArrayList<>();
         while (resultSet.next()) {
-            fId_name.put(resultSet.getInt(1), resultSet.getString(2));
+            List<Integer> tmp = new ArrayList<>();
+            tmp.add(resultSet.getInt(1));
+            tmp.add(resultSet.getInt(2));
+            tmp.add(resultSet.getInt(3));
+            tmp.add(resultSet.getInt(4));
+            tmp.add(resultSet.getInt(5));
+            bugFixFileHunkIds.add(tmp);
         }
-        for (Integer integer : fId_name.keySet()) {
-            sql = "update extraction1,files set bug_introducing=1 where extraction1.file_id=files.id and file_name='"
-                    + fId_name.get(integer)
-                    + "' and commit_id IN (select bug_commit_id "
-                    + "from hunk_blames where hunk_id=" + integer + ")";
-            stmt.executeUpdate(sql);
+        for (List<Integer> id_list : bugFixFileHunkIds) {
+            sql = "select hunks.id,new_start_line,new_end_line from hunks where "
+                    + "commit_id=(select bug_commit_id from hunk_blame where hunk_id=" + id_list.get(2) + ") and "
+                    + "file_id=" + id_list.get(1);
+            resultSet = stmt.executeQuery(sql);
+            while (resultSet.next()) {
+                int lastHunkId = resultSet.getInt(1);
+                int lastHunkStart = resultSet.getInt(2);
+                int lastHunkEnd = resultSet.getInt(3);
+                if (id_list.get(3) < lastHunkEnd || id_list.get(4) > lastHunkStart) {
+                    continue;
+                } else {
+                    sql = "update " + metaTableName + " set bug_introducing=1 where " + metaTableName + "" +
+                            ".hunk_id=" + lastHunkId;
+                    stmt.executeUpdate(sql);
+                }
+            }
+
         }
     }
 
@@ -1213,9 +1218,6 @@ public final class ExtractionMeta extends Extraction {
                 + project.toLowerCase().substring(1);
         ExtractionMeta extractionMeta = new ExtractionMeta(database, start_commit_id,
                 end_commit_id);
-        extractionMeta.mustTotal();
-        extractionMeta.canPart();
-
         // ExtractionMetrics extraction2 = new ExtractionMetrics(database, start_commit_id,
         // end_commit_id);
         // extraction2.Get_icfId();
