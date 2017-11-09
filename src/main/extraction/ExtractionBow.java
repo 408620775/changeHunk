@@ -72,8 +72,6 @@ public class ExtractionBow extends Extraction {
         for (List<Integer> list : commit_fileIds) {
             contentMap.put(list, new StringBuffer());
         }
-
-
         changeLogInfo();
         sourceInfo(projectHome);
         pathInfo();

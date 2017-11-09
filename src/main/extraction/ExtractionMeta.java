@@ -58,16 +58,46 @@ public final class ExtractionMeta extends Extraction {
      * 生成mataTable表,并将相关数据填入表中.
      */
     public void getMetaTableData() throws Exception {
+        long sTime = System.currentTimeMillis();
         CreateTable();
+        long eTime = System.currentTimeMillis();
+        System.out.println("CreateTable() cost time:"+(eTime-sTime));
+        sTime=eTime;
         initial();
+        eTime = System.currentTimeMillis();
+        System.out.println("initial() cost time:"+(eTime-sTime));
+        sTime=eTime;
         bug_introducing();
+        eTime = System.currentTimeMillis();
+        System.out.println("bug_introducing() cost time:"+(eTime-sTime));
+        sTime=eTime;
         cumulative_bug_count();
+        eTime = System.currentTimeMillis();
+        System.out.println("cumulative_bug_count() cost time:"+(eTime-sTime));
+        sTime=eTime;
         cumulative_change_count();
+        eTime = System.currentTimeMillis();
+        System.out.println("cumulative_change_count() cost time:"+(eTime-sTime));
+        sTime=eTime;
         author_name(false);
+        eTime = System.currentTimeMillis();
+        System.out.println("author_name() cost time:"+(eTime-sTime));
+        sTime=eTime;
         commit_day(false);
+        eTime = System.currentTimeMillis();
+        System.out.println("commit_day() cost time:"+(eTime-sTime));
+        sTime=eTime;
         commit_hour(false);
+        eTime = System.currentTimeMillis();
+        System.out.println("commit_hour() cost time:"+(eTime-sTime));
+        sTime=eTime;
         change_log_length(false);
+        eTime = System.currentTimeMillis();
+        System.out.println("change_log_length() cost time:"+(eTime-sTime));
+        sTime=eTime;
         changed_LOC(false);
+        eTime = System.currentTimeMillis();
+        System.out.println("changed_LOC() cost time:"+(eTime-sTime));
     }
 
     /**
@@ -79,6 +109,26 @@ public final class ExtractionMeta extends Extraction {
      * @throws SQLException
      */
     public void CreateTable() throws SQLException {
+        sql = "show tables";
+        resultSet = stmt.executeQuery(sql);
+        boolean alreadyExist = false;
+        while (resultSet.next()) {
+            if (resultSet.getString(1).equals(metaTableName)) {
+                System.out.println("Already has the table: " + metaTableName);
+                System.out.println("Table will be uninstalled");
+                alreadyExist = true;
+            }
+        }
+        if (alreadyExist) {
+            sql = "DROP TABLE " + metaTableName;
+            int result = stmt.executeUpdate(sql);
+            if (result != -1) {
+                System.out.println("Drop table successfully.");
+            } else {
+                System.out.println("Drop table fail.");
+                throw new SQLException();
+            }
+        }
         sql = "create table " + metaTableName + "(id int(11) primary key not null auto_increment,commit_id int(11),"
                 + "file_id int(11), hunk_id int(11), author_name varchar(40),commit_day varchar(15),commit_hour int(2),"
                 + "cumulative_change_count int(15) default 0,cumulative_bug_count int(15) default 0,"
@@ -125,7 +175,7 @@ public final class ExtractionMeta extends Extraction {
                 }
             }
             for (List<Integer> list2 : list) {
-                sql = "insert metaTable (commit_id,file_id,hunk_id) values("
+                sql = "insert " + metaTableName + " (commit_id,file_id,hunk_id) values("
                         + list2.get(0) + "," + list2.get(1) + "," + list2.get(2) + ")";
                 stmt.executeUpdate(sql);
             }
@@ -472,7 +522,7 @@ public final class ExtractionMeta extends Extraction {
      */
     public void bug_introducing() throws SQLException {
         System.out.println("get bug introducing");
-        sql = "select " + metaTableName + ".commit_id," + metaTableName + ".file_id,hunk_id,old_start_line,old_end_line,"
+        sql = "select " + metaTableName + ".commit_id," + metaTableName + ".file_id,hunk_id,old_start_line,old_end_line"
                 + " from " + metaTableName + ",scmlog,hunks where " + metaTableName
                 + ".commit_id=scmlog.id and is_bug_fix=1 and hunk_id=hunks.id";
         resultSet = stmt.executeQuery(sql);

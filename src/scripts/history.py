@@ -6,11 +6,16 @@ import sys
 import datetime
 import getopt
 
+
 class extraction1:
     # 定义构造方法
+    username = ''
+    password = ''
+    metaTableName = ''
+
     def __init__(self, database, startNum, endNum):
-        (username, password) = self.readDatabaseConfig()
-        self.conn = MySQLdb.connect(host="localhost", port=3306, user=username, passwd=password, db=database)
+        self.readDatabaseConfig()
+        self.conn = MySQLdb.connect(host="localhost", port=3306, user=self.username, passwd=self.password, db=database)
         self.cursor = self.conn.cursor()
         self.curAttributes = set()
         self.cursor.execute("select id from scmlog order by commit_date")
@@ -21,31 +26,30 @@ class extraction1:
                       'Oct': 10, 'Nov': 11, 'Dec': 12}
         for content in row[startNum - 1:endNum]:
             self.commit_ids.append(int(content[0]))
-        # print commit_ids,len(commit_ids)
+            # print commit_ids,len(commit_ids)
 
     def readDatabaseConfig(self):
         config = open('database.properties')
-        username = ''
-        password = ''
         line = config.readline()
         while line:
             if line.startswith("UserName"):
-                username = line.split('=')[1].strip('\n')
+                self.username = line.split('=')[1].strip('\n')
             elif line.startswith('Password'):
-                password = line.split('=')[1].strip('\n')
+                self.password = line.split('=')[1].strip('\n')
+            elif line.startswith('MetaTableName'):
+                self.metaTableName = line.split('=')[1].strip('\n')
             line = config.readline()
-        return username, password
 
     def history(self, gitProject):
-        self.cursor.execute("desc extraction1")
+        self.cursor.execute("desc " + self.metaTableName)
         row = self.cursor.fetchall()
         for content in row:
             self.curAttributes.add(content[0])
         if 'NEDV' not in self.curAttributes:
-            self.cursor.execute("ALTER TABLE extraction1 ADD (NEDV int,AGE long,NUC int)")
+            self.cursor.execute("ALTER TABLE " + self.metaTableName + " ADD (NEDV int,AGE long,NUC int)")
             self.conn.commit()
         if 'EXP' not in self.curAttributes:
-            self.cursor.execute("ALTER TABLE extraction1 ADD (EXP int,REXP float,SEXP int)")
+            self.cursor.execute("ALTER TABLE " + self.metaTableName + " ADD (EXP int,REXP float,SEXP int)")
             self.conn.commit()
         self.commit_fileIdInExtraction1 = self.getCommitFileIdMap(self.commit_ids);
         tmpFile = os.path.split(os.path.realpath(sys.argv[0]))[0] + '/tmp.txt'
@@ -70,9 +74,9 @@ class extraction1:
             os.system('git whatchanged ' + file_name + ' >' + tmpFile)
             (nedv, age, nuc, rexp) = self.dealWithGitLog(tmpFile)
             self.cursor.execute(
-                "select current_file_path from extraction1,scmlog,actions where extraction1.commit_id=scmlog.id and author_id=" + str(
-                    author_id) + " and commit_date<'" + str(
-                    commit_date) + "' and extraction1.commit_id=actions.commit_id and extraction1.file_id=actions.file_id")
+                "select current_file_path from " + self.metaTableName + ",scmlog,actions where " + self.metaTableName
+                + ".commit_id=scmlog.id and author_id=" + str(author_id) + " and commit_date<'" + str(commit_date)
+                + "' and " + self.metaTableName + ".commit_id=actions.commit_id and " + self.metaTableName + ".file_id=actions.file_id")
             row = self.cursor.fetchall()
             exp = 0
             sexp = 0
@@ -82,7 +86,7 @@ class extraction1:
                 exp = exp + 1
                 if res[0].startswith(subSystem):
                     sexp = sexp + 1
-            finalOrder = 'update extraction1 set NEDV=' + str(nedv) + ',AGE=' + str(age) + ',NUC=' + str(
+            finalOrder = 'update ' + self.metaTableName + ' set NEDV=' + str(nedv) + ',AGE=' + str(age) + ',NUC=' + str(
                 nuc) + ',EXP=' + str(exp) + ',REXP=' + str(rexp) + ',SEXP=' + str(sexp) + ' where commit_id=' + str(
                 key) + ' and file_id=' + str(file_id)
             print finalOrder
@@ -94,8 +98,9 @@ class extraction1:
         count = 0
         for commit_id in commit_ids:
             self.cursor.execute(
-                "select extraction1.file_id,current_file_path from extraction1,actions where extraction1.commit_id=" + str(
-                    commit_id) + " and extraction1.file_id=actions.file_id and extraction1.commit_id=actions.commit_id")
+                "select " + self.metaTableName + ".file_id,current_file_path from " + self.metaTableName + ","
+                "actions where "+ self.metaTableName + ".commit_id=" + str(commit_id) + " and " + self.metaTableName
+                + ".file_id=actions.file_id and " + self.metaTableName + ".commit_id=actions.commit_id")
             row = self.cursor.fetchall()
             if row:
                 if commit_id not in myDict.keys():
@@ -172,7 +177,8 @@ class extraction1:
 
 def usage():
     print """
-Obtain history infomation for the specified data range, and the result will be saved in the extraction1 table in the database which miningit obtain.
+Obtain history infomation for the specified data range, and the result will be saved in the metaTableName table in the 
+database which miningit obtain.
 
 Options:
 
