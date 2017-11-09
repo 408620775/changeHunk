@@ -6,7 +6,6 @@ import src.main.exception.InsExistenceException;
 import java.io.*;
 import java.sql.SQLException;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.Map.Entry;
 
@@ -62,16 +61,13 @@ public final class ExtractionMeta extends Extraction {
         CreateTable();
         initial();
         bug_introducing();
-        cumulative_bug_count();  //
+        cumulative_bug_count();
+        cumulative_change_count();
         author_name(false);
         commit_day(false);
         commit_hour(false);
         change_log_length(false);
         changed_LOC(false);
-    }
-
-    public SQLConnection getConnection() {
-        return sqlL;
     }
 
     /**
@@ -346,7 +342,7 @@ public final class ExtractionMeta extends Extraction {
     // FIXME 此函数也需要在resources包中的history.py中实现.但是目前还没有发现其实现办法.
     public void cumulative_bug_count() throws Exception {
         System.out.println("get cumulative bug count");
-        sql = "select count(*) from extraction1";
+        sql = "select count(*) from " + metaTableName;
         resultSet = stmt.executeQuery(sql);
         int totalNum = 0;
         while (resultSet.next()) {
@@ -354,8 +350,8 @@ public final class ExtractionMeta extends Extraction {
         }
         Map<String, Integer> fileName_curBugCount = new HashMap<>();
         for (int i = 1; i <= totalNum; i++) {
-            sql = "select file_name,bug_introducing from files,extraction1 where file_id=files.id and extraction1.id="
-                    + i;
+            sql = "select file_name,bug_introducing from files," + metaTableName + " where file_id=files.id and " +
+                    metaTableName + ".id=" + i;
             resultSet = stmt.executeQuery(sql);
             String file_name = null;
             int bug_introducing = 0;
@@ -380,7 +376,7 @@ public final class ExtractionMeta extends Extraction {
                 e.printStackTrace();
                 throw e;
             }
-            sql = "update extraction1 set cumulative_bug_count="
+            sql = "update " + metaTableName + " set cumulative_bug_count="
                     + fileName_curBugCount.get(file_name) + " where id=" + i;
             stmt.executeUpdate(sql);
         }
@@ -395,7 +391,7 @@ public final class ExtractionMeta extends Extraction {
     @SuppressWarnings("unused")
     private void cumulative_change_count() throws SQLException {
         System.out.println("get cumulative change count");
-        sql = "select count(*) from extraction1";
+        sql = "select count(*) from " + metaTableName;
         resultSet = stmt.executeQuery(sql);
         int totalNum = 0;
         while (resultSet.next()) {
@@ -404,7 +400,7 @@ public final class ExtractionMeta extends Extraction {
         Map<String, Integer> fileName_curChangeCount = new HashMap<>();
 
         for (int i = 1; i <= totalNum; i++) {
-            sql = "select file_name from files,extraction1 where file_id=files.id and extraction1.id="
+            sql = "select file_name from files,extraction1 where file_id=files.id and " + metaTableName + ".id="
                     + i;
             resultSet = stmt.executeQuery(sql);
             String file_name = null;
@@ -417,7 +413,7 @@ public final class ExtractionMeta extends Extraction {
             } else {
                 fileName_curChangeCount.put(file_name, 1);
             }
-            sql = "update extraction1 set cumulative_change_count="
+            sql = "update "+metaTableName+" set cumulative_change_count="
                     + fileName_curChangeCount.get(file_name) + " where id=" + i;
             stmt.executeUpdate(sql);
         }
@@ -962,37 +958,6 @@ public final class ExtractionMeta extends Extraction {
         return Integer.parseInt(commit_date.split(" ")[0].split("-")[0]);
     }
 
-    /**
-     * 根据给定的commit_fileId对,返回每个对儿对应的类标签.
-     *
-     * @param someCommit_fileIds 要求返回类标签的commit_fileId对.
-     * @return 包含类标签的map信息.
-     * @throws SQLException
-     * @throws InsExistenceException
-     */
-    // 可与obtainCFidInExtraction1函数合并.
-    public Map<List<Integer>, String> getClassLabels(
-            List<List<Integer>> someCommit_fileIds) throws SQLException,
-            InsExistenceException {
-        Map<List<Integer>, String> map = new LinkedHashMap<List<Integer>, String>();
-        for (List<Integer> list : someCommit_fileIds) {
-            sql = "select bug_introducing from extraction1 where commit_id="
-                    + list.get(0) + " and file_id=" + list.get(1);
-            resultSet = stmt.executeQuery(sql);
-            String bug_intro = null;
-            while (resultSet.next()) {
-                bug_intro = resultSet.getString(1);
-            }
-
-            if (bug_intro == null) {
-                throw new InsExistenceException(list.get(0), list.get(1));
-            } else {
-                map.put(list, bug_intro);
-            }
-        }
-        return map;
-    }
-
     @Override
     public Map<List<Integer>, StringBuffer> getContentMap(
             List<List<Integer>> someCommit_fileIds) throws SQLException {
@@ -1025,78 +990,6 @@ public final class ExtractionMeta extends Extraction {
             content.put(commit_fileId, temp);
         }
         return content;
-    }
-
-    static public void Automatic1(String project, int start_commit_id,
-                                  int end_commit_id) throws Exception {
-        String database = "My"
-                + project.toLowerCase().substring(0, 1).toUpperCase()
-                + project.toLowerCase().substring(1);
-        ExtractionMeta extractionMeta = new ExtractionMeta(database, start_commit_id,
-                end_commit_id);
-        // ExtractionMetrics extraction2 = new ExtractionMetrics(database, start_commit_id,
-        // end_commit_id);
-        // extraction2.Get_icfId();
-        // Process process = Runtime.getRuntime().exec(
-        // "./home/niu/workspace/changeClassify/src/extraction/GetFile.sh "
-        // + project);
-        // System.out.println("the exit value of process is "
-        // + process.exitValue());
-    }
-
-    static public void Automatic2(String project, int start_commit_id,
-                                  int end_commit_id) throws Exception {
-        String database = "My"
-                + project.toLowerCase().substring(0, 1).toUpperCase()
-                + project.toLowerCase().substring(1);
-        ExtractionMeta extractionMeta = new ExtractionMeta(database, start_commit_id,
-                end_commit_id);
-        ExtractionMetrics extractionMetrics = new ExtractionMetrics(database, start_commit_id,
-                end_commit_id);
-        String metric = database + "Metrics.txt";
-        extractionMetrics.extraFromTxt(metric);
-        ExtractionBow extractionBow = new ExtractionBow(database, project + "Files",
-                start_commit_id, end_commit_id);
-
-        List<List<Integer>> commit_fileIds = extractionMeta.commit_fileIds;
-        List<Map<List<Integer>, StringBuffer>> list = new ArrayList<>();
-        Map<List<Integer>, StringBuffer> map1 = extractionMeta
-                .getContentMap(commit_fileIds);
-        checkConsistency(map1);
-        Map<List<Integer>, StringBuffer> map2 = extractionMetrics
-                .getContentMap(commit_fileIds);
-        checkConsistency(map2);
-        Map<List<Integer>, StringBuffer> map3 = extractionBow
-                .getContentMap(commit_fileIds);
-        checkConsistency(map3);
-        list.add(map1);
-        list.add(map2);
-        list.add(map3);
-        FileOperation.writeContentMap(Merge.mergeMap(list), database + ".csv");
-    }
-
-    private static void checkConsistency(Map<List<Integer>, StringBuffer> map1) {
-        List<Integer> title = new ArrayList<>();
-        title.add(-1);
-        title.add(-1);
-        int titleSize = map1.get(title).toString().split(",").length;
-        for (List<Integer> key : map1.keySet()) {
-            if (map1.get(key).toString().split(",").length != titleSize) {
-                System.out.println("Error! " + key.get(0) + " " + key.get(1));
-            }
-        }
-    }
-
-    public static void main(String[] args) throws Exception {
-        // Automatic1("hadoop", 10001, 10300);
-        Automatic2("hadoop", 5501, 5800);
-        // ExtractionMeta extraction1=new ExtractionMeta("MyHadoop", 5501, 6000);
-        // extraction1.canPart();
-        // ExtractionMetrics extraction2 = new ExtractionMetrics("MyHadoop", 5501,
-        // 6000);
-        // extraction2.Get_icfId();
-        // extraction2.recoverPreFile("hadoopFiles");
-
     }
 }
 
