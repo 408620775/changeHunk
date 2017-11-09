@@ -413,7 +413,7 @@ public final class ExtractionMeta extends Extraction {
             } else {
                 fileName_curChangeCount.put(file_name, 1);
             }
-            sql = "update "+metaTableName+" set cumulative_change_count="
+            sql = "update " + metaTableName + " set cumulative_change_count="
                     + fileName_curChangeCount.get(file_name) + " where id=" + i;
             stmt.executeUpdate(sql);
         }
@@ -523,7 +523,7 @@ public final class ExtractionMeta extends Extraction {
         diffusion(false);
         size(false);
         purpose(false);
-        history2(gitFile);
+        history(gitFile);
     }
 
     /**
@@ -540,7 +540,7 @@ public final class ExtractionMeta extends Extraction {
             obtainCurAttributes();
         }
         if (!curAttributes.contains("ns")) {
-            sql = "alter table extraction1 add (ns int(4),nd int(4),nf int(4),entropy float)";
+            sql = "alter table " + metaTableName + " add (ns int(4),nd int(4),nf int(4),entropy float)";
             stmt.executeUpdate(sql);
             curAttributes.add("ns");
             curAttributes.add("nd");
@@ -578,7 +578,7 @@ public final class ExtractionMeta extends Extraction {
                     directories.add(path[path.length - 2]);
                 }
             }
-            sql = "select changed_LOC from extraction1 where commit_id="
+            sql = "select changed_LOC from " + metaTableName + " where commit_id="
                     + commit_fileId.get(0);
             resultSet = stmt.executeQuery(sql);
             List<Integer> changeOfFile = new ArrayList<>();
@@ -597,8 +597,7 @@ public final class ExtractionMeta extends Extraction {
             } else {
                 entropy = entropy / maxEntropy;
             }
-            sql = "UPDATE extraction1 SET ns=" + subsystem.size() + ",nd="
-                    + directories.size() + ",nf=" + files.size() + ",entropy="
+            sql = "UPDATE " + metaTableName + "=" + files.size() + ",entropy="
                     + entropy + " where commit_id=" + commit_fileId.get(0);
             stmt.executeUpdate(sql);
         }
@@ -619,7 +618,7 @@ public final class ExtractionMeta extends Extraction {
             obtainCurAttributes();
         }
         if (!curAttributes.contains("la")) {
-            sql = "alter table extraction1 add (la int,ld int,lt int)";
+            sql = "alter table " + metaTableName + " add (la int,ld int,lt int)";
             stmt.executeUpdate(sql);
             curAttributes.add("la");
             curAttributes.add("ld");
@@ -638,7 +637,7 @@ public final class ExtractionMeta extends Extraction {
 
         List<List<Integer>> re = new ArrayList<>();
         for (List<Integer> list : executeList) {
-            sql = "select id,file_id from extraction1 where commit_id="
+            sql = "select id,file_id from " + metaTableName + " where commit_id="
                     + list.get(0);
             resultSet = stmt.executeQuery(sql);
             while (resultSet.next()) {
@@ -650,32 +649,46 @@ public final class ExtractionMeta extends Extraction {
             }
         }
         for (List<Integer> list : re) {
-            sql = "select old_start_line,old_end_line,new_start_line,new_end_line from hunks where commit_id="
+            sql = "select old_start_line,old_end_line,new_start_line,new_end_line,id from hunks where commit_id="
                     + list.get(1) + " and file_id=" + list.get(2);
+            Map<Integer, int[]> map = new HashMap<>();
+            int ldFileLevel = 0;
+            int laFileLevel = 0;
+            int ltFileLevel = 0;
             resultSet = stmt.executeQuery(sql);
-            int la = 0;
-            int ld = 0;
-            int lt = 0;
             while (resultSet.next()) {
+                int ldHunkLevel = 0;
+                int laHunkLevel = 0;
                 if (resultSet.getInt(1) != 0) {
-                    ld = ld + resultSet.getInt(2) - resultSet.getInt(1) + 1;
+                    ldHunkLevel = resultSet.getInt(2) - resultSet.getInt(1) + 1;
                 }
                 if (resultSet.getInt(3) != 0) {
-                    la = la + resultSet.getInt(4) - resultSet.getInt(3) + 1;
+                    laHunkLevel = resultSet.getInt(4) - resultSet.getInt(3) + 1;
                 }
+                int[] array = new int[2];
+                array[0] = ldHunkLevel;
+                array[1] = laHunkLevel;
+                ldFileLevel += ldHunkLevel;
+                laFileLevel += laHunkLevel;
+                map.put(resultSet.getInt(5), array);
             }
-            sql = "SELECT sloc FROM extraction1 where commit_id=" + list.get(1)
+            for (Integer hunk_id : map.keySet()) {
+                sql = "UPDATE " + metaTableName + " SET ld=" + map.get(hunk_id)[0] + " ,la=" + map.get(hunk_id)[1] + " where " +
+                        "hunk_id=" + hunk_id;
+                stmt.executeUpdate(sql);
+            }
+            sql = "SELECT sloc FROM " + metaTableName + " where commit_id=" + list.get(1)
                     + " and file_id=" + list.get(2);
             resultSet = stmt.executeQuery(sql);
             while (resultSet.next()) {
-                lt = resultSet.getInt(1);
+                ltFileLevel = resultSet.getInt(1);
             }
-            lt = lt - la + ld;
-            if (lt < 0) {
+            ltFileLevel = ltFileLevel - laFileLevel + ldFileLevel;
+            if (ltFileLevel < 0) {
                 System.out.println("lt<0!!!" + " id=" + list.get(0));
             }
-            sql = "UPDATE extraction1 SET la=" + la + ",ld=" + ld + ",lt=" + lt
-                    + " where id=" + list.get(0);
+            sql = "UPDATE " + metaTableName + " SET lt=" + ltFileLevel
+                    + " where commit_id=" + list.get(0) + " file_id=" + list.get(1);
             stmt.executeUpdate(sql); // 这个信息，似乎在extraction2中的detal计算时已经包含了啊。
         }
     }
@@ -726,7 +739,7 @@ public final class ExtractionMeta extends Extraction {
             obtainCurAttributes();
         }
         if (!curAttributes.contains("fix")) {
-            sql = "alter table extraction1 add fix tinyint(1) default 0";
+            sql = "alter table " + metaTableName + " add fix tinyint(1) default 0";
             stmt.executeUpdate(sql);
             curAttributes.add("fix");
         }
@@ -741,8 +754,8 @@ public final class ExtractionMeta extends Extraction {
         }
 
         for (List<Integer> list : executeList) {
-            sql = "UPDATE extraction1,scmlog SET fix=is_bug_fix where extraction1.commit_id=scmlog.id and extraction1.commit_id="
-                    + list.get(0);
+            sql = "UPDATE " + metaTableName + ",scmlog SET fix=is_bug_fix where " + metaTableName + ".commit_id=scmlog.id and"
+                    + " " + metaTableName + ".commit_id=" + list.get(0);
             stmt.executeUpdate(sql);
         }
     }
@@ -755,11 +768,11 @@ public final class ExtractionMeta extends Extraction {
      * @throws InterruptedException
      */
     //
-    public void history2(String gitFile) throws IOException,
+    public void history(String gitFile) throws IOException,
             InterruptedException {
         System.out.println("Update history With Python");
         String command = "python " + System.getProperty("user.dir")
-                + "/src/pers/bbn/changeBug/scripts/history.py -d "
+                + "/src/scripts/history.py -d "
                 + databaseName + " -s " + start + " -e " + end + " -g "
                 + gitFile;
         System.out.println(command);
@@ -772,10 +785,8 @@ public final class ExtractionMeta extends Extraction {
         }
         BufferedReader eReader = new BufferedReader(new InputStreamReader(
                 pythonProcess.getErrorStream()));
-        while ((line = eReader.readLine()) != null) {
-            System.out.println(line);
-        }
-        pythonProcess.waitFor();
+        while ((line = eReader.readLine()) != null)
+            pythonProcess.waitFor();
     }
 
     /**
