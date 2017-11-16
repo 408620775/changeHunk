@@ -2,3 +2,4 @@
 out/*
 changeHunk.iml
 log
+*.xml
