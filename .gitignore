@@ -1,4 +1,4 @@
-.idea
+.idea/*
 out/*
 changeHunk.iml
 将删除 out/
