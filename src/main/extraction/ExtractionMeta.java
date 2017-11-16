@@ -22,7 +22,7 @@ public final class ExtractionMeta extends Extraction {
     private List<List<Integer>> commit_file_inExtracion1;
     private String message;
     public static String metaTableName = "metaHunk";
-    public static String metaTableNamekey = "MetaTable";
+    public static String metaTableNamekey = "MetaTableName";
 
 
     /**
@@ -203,7 +203,7 @@ public final class ExtractionMeta extends Extraction {
     private void obtainCurAttributes() throws SQLException {
         if (curAttributes == null) {
             curAttributes = new ArrayList<>();
-            sql = "desc metaTable";
+            sql = "desc "+metaTableName;
             resultSet = stmt.executeQuery(sql);
             while (resultSet.next()) {
                 curAttributes.add(resultSet.getString(1));
@@ -450,7 +450,7 @@ public final class ExtractionMeta extends Extraction {
         Map<String, Integer> fileName_curChangeCount = new HashMap<>();
 
         for (int i = 1; i <= totalNum; i++) {
-            sql = "select file_name from files,extraction1 where file_id=files.id and " + metaTableName + ".id="
+            sql = "select file_name from files,"+metaTableName+" where file_id=files.id and " + metaTableName + ".id="
                     + i;
             resultSet = stmt.executeQuery(sql);
             String file_name = null;
@@ -538,9 +538,10 @@ public final class ExtractionMeta extends Extraction {
         }
         for (List<Integer> id_list : bugFixFileHunkIds) {
             sql = "select hunks.id,new_start_line,new_end_line from hunks where "
-                    + "commit_id=(select bug_commit_id from hunk_blame where hunk_id=" + id_list.get(2) + ") and "
+                    + "commit_id IN (select bug_commit_id from hunk_blames where hunk_id=" + id_list.get(2) + ") and "
                     + "file_id=" + id_list.get(1);
             resultSet = stmt.executeQuery(sql);
+            List<Integer> bug_hunk_ids = new ArrayList<>();
             while (resultSet.next()) {
                 int lastHunkId = resultSet.getInt(1);
                 int lastHunkStart = resultSet.getInt(2);
@@ -548,10 +549,13 @@ public final class ExtractionMeta extends Extraction {
                 if (id_list.get(3) < lastHunkEnd || id_list.get(4) > lastHunkStart) {
                     continue;
                 } else {
-                    sql = "update " + metaTableName + " set bug_introducing=1 where " + metaTableName + "" +
-                            ".hunk_id=" + lastHunkId;
-                    stmt.executeUpdate(sql);
+                    bug_hunk_ids.add(lastHunkId);
                 }
+            }
+            for (Integer bug_hunk_id : bug_hunk_ids) {
+                sql = "update " + metaTableName + " set bug_introducing=1 where " + metaTableName + "" +
+                        ".hunk_id=" + bug_hunk_id;
+                stmt.executeUpdate(sql);
             }
 
         }
@@ -647,7 +651,8 @@ public final class ExtractionMeta extends Extraction {
             } else {
                 entropy = entropy / maxEntropy;
             }
-            sql = "UPDATE " + metaTableName + "=" + files.size() + ",entropy="
+            sql = "UPDATE "+metaTableName+" SET ns=" + subsystem.size() + ",nd="
+                    + directories.size() + ",nf=" + files.size() + ",entropy="
                     + entropy + " where commit_id=" + commit_fileId.get(0);
             stmt.executeUpdate(sql);
         }
@@ -675,7 +680,7 @@ public final class ExtractionMeta extends Extraction {
             curAttributes.add("lt");
         }
 
-        List<List<Integer>> executeList = null;
+        List<List<Integer>> executeList;
         if (excuteAll == true) {
             if (commit_file_inExtracion1 == null) {
                 obtainCFidInExtraction1();
@@ -684,23 +689,9 @@ public final class ExtractionMeta extends Extraction {
         } else {
             executeList = commit_fileIds;
         }
-
-        List<List<Integer>> re = new ArrayList<>();
         for (List<Integer> list : executeList) {
-            sql = "select id,file_id from " + metaTableName + " where commit_id="
-                    + list.get(0);
-            resultSet = stmt.executeQuery(sql);
-            while (resultSet.next()) {
-                List<Integer> temp = new ArrayList<>();
-                temp.add(resultSet.getInt(1));
-                temp.add(list.get(0));
-                temp.add(resultSet.getInt(2));
-                re.add(temp);
-            }
-        }
-        for (List<Integer> list : re) {
             sql = "select old_start_line,old_end_line,new_start_line,new_end_line,id from hunks where commit_id="
-                    + list.get(1) + " and file_id=" + list.get(2);
+                    + list.get(0) + " and file_id=" + list.get(1);
             Map<Integer, int[]> map = new HashMap<>();
             int ldFileLevel = 0;
             int laFileLevel = 0;
@@ -727,18 +718,18 @@ public final class ExtractionMeta extends Extraction {
                         "hunk_id=" + hunk_id;
                 stmt.executeUpdate(sql);
             }
-            sql = "SELECT sloc FROM " + metaTableName + " where commit_id=" + list.get(1)
-                    + " and file_id=" + list.get(2);
+            sql = "SELECT sloc FROM " + metaTableName + " where commit_id=" + list.get(0)
+                    + " and file_id=" + list.get(1);
             resultSet = stmt.executeQuery(sql);
             while (resultSet.next()) {
                 ltFileLevel = resultSet.getInt(1);
             }
             ltFileLevel = ltFileLevel - laFileLevel + ldFileLevel;
             if (ltFileLevel < 0) {
-                System.out.println("lt<0!!!" + " id=" + list.get(0));
+                System.out.println("lt<0!!!" + " commit_id="+list.get(0)+"file_id=" + list.get(1));
             }
             sql = "UPDATE " + metaTableName + " SET lt=" + ltFileLevel
-                    + " where commit_id=" + list.get(0) + " file_id=" + list.get(1);
+                    + " where commit_id=" + list.get(0) + " and file_id=" + list.get(1);
             stmt.executeUpdate(sql); // 这个信息，似乎在extraction2中的detal计算时已经包含了啊。
         }
     }
