@@ -1,5 +1,6 @@
-.idea/*
+/.idea/*
 out/*
+.idea/workspace.xml
 changeHunk.iml
 log
 *.xml
