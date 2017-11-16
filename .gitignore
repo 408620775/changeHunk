@@ -1,4 +1,4 @@
-.idea/*
+.idea
 out/*
-changeHunkLog
-log
+changeHunk.iml
+将删除 out/

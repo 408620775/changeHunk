@@ -29,7 +29,8 @@ class extraction1:
             # print commit_ids,len(commit_ids)
 
     def readDatabaseConfig(self):
-        config = open('database.properties')
+        databasePro = os.path.abspath(os.path.join(os.getcwd(), "../..")) + '/database.properties'
+        config = open(databasePro)
         line = config.readline()
         while line:
             if line.startswith("UserName"):
@@ -57,6 +58,7 @@ class extraction1:
         os.chdir(gitProject)  # 进入git工程所在目录
         for key in self.commit_fileIdInExtraction1.keys():
             self.updateHistoryForCommit(key)
+        os.remove(tmpFile)
 
     def updateHistoryForCommit(self, key):
         print 'commitId:' + str(key)
@@ -98,9 +100,10 @@ class extraction1:
         count = 0
         for commit_id in commit_ids:
             self.cursor.execute(
-                "select " + self.metaTableName + ".file_id,current_file_path from " + self.metaTableName + ","
-                "actions where "+ self.metaTableName + ".commit_id=" + str(commit_id) + " and " + self.metaTableName
-                + ".file_id=actions.file_id and " + self.metaTableName + ".commit_id=actions.commit_id")
+                "select " + self.metaTableName + ".file_id,current_file_path from " + self.metaTableName + ",actions where "
+                + self.metaTableName + ".commit_id=" + str(commit_id) + " and " + self.metaTableName+
+                ".file_id=actions.file_id and " + self.metaTableName + ".commit_id=actions.commit_id GROUP BY "
+                + self.metaTableName + ".file_id,current_file_path")
             row = self.cursor.fetchall()
             if row:
                 if commit_id not in myDict.keys():

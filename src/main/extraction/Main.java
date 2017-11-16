@@ -8,7 +8,7 @@ public class Main {
     public static void main(String[] args) throws Exception {
         ExtractionMeta meta = new ExtractionMeta("MyVoldemort",501,800);
         meta.loadProperty("database.properties");
-        meta.getMetaTableData();
-        meta.just_in_time("/home/niu/test/voldemort");
+        double ratio=meta.countRatio2();
+        System.out.println(ratio);
     }
 }

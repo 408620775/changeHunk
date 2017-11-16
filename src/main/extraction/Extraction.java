@@ -32,6 +32,7 @@ public abstract class Extraction {
     List<List<Integer>> commit_fileIds;
     List<Integer> commit_ids;
     List<Integer> commitIdPart;
+    List<List<Integer>> commit_file_hunkIds;
     SQLConnection sqlL;
     String databaseName;
 
@@ -41,7 +42,7 @@ public abstract class Extraction {
         this.databaseName = database;
         this.sqlL = new SQLConnection(database);
         this.stmt = sqlL.getStmt();
-        initialCommitFileIds();
+        initialKeys();
     }
 
     /**
@@ -49,10 +50,12 @@ public abstract class Extraction {
      *
      * @throws Exception
      */
-    private void initialCommitFileIds() throws IllegalArgumentException, SQLException, IOException {
+    private void initialKeys() throws IllegalArgumentException, SQLException, IOException {
+        System.out.println("Initial keys!");
         commit_ids = new ArrayList<>();
         commitIdPart = new ArrayList<>();
         commit_fileIds = new ArrayList<>();
+        commit_file_hunkIds = new ArrayList<>();
         sql = "select id from scmlog order by commit_date";
         resultSet = stmt.executeQuery(sql);
         while (resultSet.next()) {
@@ -72,6 +75,7 @@ public abstract class Extraction {
                     + commit_ids.get(i) + " and type!='D'";
             commitIdPart.add(commit_ids.get(i));
             resultSet = stmt.executeQuery(sql);
+            List<List<Integer>> tmpCommit_fileIds = new ArrayList<>();
             while (resultSet.next()) {
                 String current_file_path = resultSet.getString(2);
                 if (current_file_path.endsWith(".java")
@@ -80,10 +84,22 @@ public abstract class Extraction {
                     tmp.add(commit_ids.get(i));
                     tmp.add(resultSet.getInt(1));
                     commit_fileIds.add(tmp);
+                    tmpCommit_fileIds.add(tmp);
+                }
+            }
+            for (List<Integer> tmpCommit_fileId : tmpCommit_fileIds) {
+                sql = "select id from hunks where commit_id=" + tmpCommit_fileId.get(0) + " and "
+                        + "file_id=" + tmpCommit_fileId.get(1);
+                resultSet = stmt.executeQuery(sql);
+                while (resultSet.next()) {
+                    List<Integer> list = new ArrayList<>();
+                    list.add(tmpCommit_fileId.get(0));
+                    list.add(tmpCommit_fileId.get(1));
+                    list.add(resultSet.getInt(1));
+                    commit_file_hunkIds.add(list);
                 }
             }
         }
-
         logger.info("commit_fileIds are :");
         StringBuilder sBuilder = new StringBuilder();
         for (int i = 0; i < commit_fileIds.size(); i++) {
