@@ -1046,24 +1046,6 @@ public final class ExtractionMeta extends Extraction {
     }
 
     public double countRatio() throws SQLException {
-        int total = 0;
-        int bug = 0;
-        System.out.println(commit_file_hunkIds.size());
-        for (List<Integer> commit_file_hunkId : commit_file_hunkIds) {
-            sql = "select bug_introducing from " + metaTableName + " where hunk_id=" + commit_file_hunkId.get(2);
-            resultSet = stmt.executeQuery(sql);
-            while (resultSet.next()) {
-                int result = resultSet.getInt(1);
-                if (result == 1) {
-                    bug += 1;
-                }
-                total += 1;
-            }
-        }
-        return (double) bug / total;
-    }
-
-    public double countRatio2() throws SQLException {
         int minId = Integer.MAX_VALUE;
         int maxId = Integer.MIN_VALUE;
         int total = 0;
