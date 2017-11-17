@@ -1,4 +1,4 @@
-package src.main.extraction;
+package extraction;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;

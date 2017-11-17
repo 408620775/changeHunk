@@ -1,4 +1,4 @@
-package src.main.extraction;
+package extraction;
 
 import org.apache.log4j.Logger;
 

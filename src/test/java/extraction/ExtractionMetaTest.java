@@ -1,10 +1,9 @@
-package src.test.extraction;
+package extraction;
 
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import src.main.extraction.ExtractionMeta;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -36,7 +35,7 @@ public class ExtractionMetaTest {
         bWriter.close();
         ExtractionMeta meta = new ExtractionMeta("MyVoldemort", 501, 800);
         meta.loadProperty(propertyFileName);
-        Assert.assertEquals(meta.metaTableName, propertyContent.split("=")[1].trim());
+        assertEquals(meta.metaTableName, propertyContent.split("=")[1].trim());
         propertyFile.delete();
     }
 

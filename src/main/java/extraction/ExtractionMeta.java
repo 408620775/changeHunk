@@ -1,7 +1,6 @@
-package src.main.extraction;
+package extraction;
 
 import org.apache.log4j.Logger;
-import src.main.exception.InsExistenceException;
 
 import java.io.*;
 import java.sql.SQLException;

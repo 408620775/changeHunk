@@ -3,4 +3,12 @@ out/*
 .idea/workspace.xml
 changeHunk.iml
 log
-*.xml
+target/*
+!/pom.xml
+将删除 .idea/
+将删除 out/
+将删除 pom.xml
+将删除 src/main/java/
+将删除 src/main/resources/
+将删除 src/test/java/
+将删除 target/
