@@ -2,13 +2,13 @@ package extraction;
 
 import org.apache.log4j.Logger;
 
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 提取数据的超类。
@@ -24,25 +24,49 @@ import java.util.Map;
  */
 public abstract class Extraction {
     private static Logger logger = Logger.getLogger(ExtractionMeta.class);
-    String sql;
-    Statement stmt;
-    ResultSet resultSet;
-    int start;
-    int end;
-    List<List<Integer>> commit_fileIds;
-    List<Integer> commit_ids;
-    List<Integer> commitIdPart;
-    List<List<Integer>> commit_file_hunkIds;
-    SQLConnection sqlL;
-    String databaseName;
+    public static String sql;
+    public static Statement stmt;
+    public static ResultSet resultSet;
+    public static int start;
+    public static int end;
+    public static List<List<Integer>> commit_fileIds;
+    public static List<Integer> commit_ids;
+    public static List<Integer> commitIdPart;
+    public static List<List<Integer>> commit_file_hunkIds;
+    public static List<Integer> title = Arrays.asList(-1, -1, -1);
+    public static SQLConnection sqlL;
+    public static String databaseName;
+    public static String metaTableName = "metaHunk";
+    public static String metaTableNamekey = "MetaTableName";
+    public static boolean hasLoadProperty = false;
 
-    public Extraction(String database, int start, int end) throws IOException, SQLException {
+    public Extraction(String database, int start, int end, String propertyPath) throws IOException, SQLException {
         this.start = start;
         this.end = end;
         this.databaseName = database;
-        this.sqlL = new SQLConnection(database);
+        this.sqlL = SQLConnection.getConnection(database);
         this.stmt = sqlL.getStmt();
         initialKeys();
+        if (!hasLoadProperty) {
+            loadProperty(propertyPath);
+        }
+    }
+
+    /**
+     * 加载配置文件中的相关设置,用于1.定义mataTable名称.
+     *
+     * @param propertyFilePath
+     * @throws IOException
+     */
+    public void loadProperty(String propertyFilePath) throws IOException {
+        Properties properties = new Properties();
+        File propertyFile = new File(propertyFilePath);
+        FileReader fReader = new FileReader(propertyFile);
+        properties.load(fReader);
+        if (properties.containsKey(metaTableNamekey)) {
+            metaTableName = properties.getProperty(metaTableNamekey);
+        }
+        logger.info("load database properties success!");
     }
 
     /**
