@@ -159,8 +159,7 @@ public abstract class Extraction {
      * @return
      * @throws SQLException
      */
-    public abstract Map<List<Integer>, StringBuffer> getContentMap(
-            List<List<Integer>> someCommit_fileIds) throws SQLException;
+    public abstract Map<List<Integer>, StringBuffer> getContentMap() throws SQLException;
 
     public void getHunksCashe() throws SQLException {
         for (List<Integer> commit_file_hunkId : commit_file_hunkIds) {

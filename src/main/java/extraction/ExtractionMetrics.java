@@ -26,6 +26,7 @@ public final class ExtractionMetrics extends Extraction {
     private List<List<Integer>> commitId_fileIds;
 
     // 不包括id,commit_id,file_id
+
     /**
      * 构造函数,通过sCommitId和eCommitId确定要提取的数据的区间.
      *
@@ -57,9 +58,9 @@ public final class ExtractionMetrics extends Extraction {
         }
         int total = 0;
         int numBug = 0;
-        System.out.println("the size of commit_fileIds is "+commit_fileIds.size());
+        System.out.println("the size of commit_fileIds is " + commit_fileIds.size());
         for (List<Integer> commit_fileId : commit_fileIds) {
-            sql = "select extraction1.commit_id,extraction1.file_id,rev,current_file_path,bug_introducing from extraction1,"
+            sql = "select "+".commit_id,extraction1.file_id,rev,current_file_path,bug_introducing from extraction1,"
                     + "scmlog,actions where extraction1.commit_id="
                     + commit_fileId.get(0)
                     + " and extraction1.file_id="
@@ -89,8 +90,7 @@ public final class ExtractionMetrics extends Extraction {
     /**
      * 对于给定的文件集合,回复集合中每个文件的上一版本.
      *
-     * @param dictory
-     *            给定的当前文件组成的文件夹.
+     * @param dictory 给定的当前文件组成的文件夹.
      * @throws SQLException
      * @throws IOException
      */
@@ -109,10 +109,8 @@ public final class ExtractionMetrics extends Extraction {
     /**
      * 根据curFile和数据库中的patch信息,恢复得到preFile.
      *
-     * @param dictory
-     *            文件所在的文件夹
-     * @param string
-     *            文件名.
+     * @param dictory 文件所在的文件夹
+     * @param string  文件名.
      * @throws SQLException
      * @throws IOException
      */
@@ -201,11 +199,11 @@ public final class ExtractionMetrics extends Extraction {
 
     // startId和endId指的是要得到的数据的区间。如果两个参数为-1
     // 则表明对extraction1中的数据全部处理。
+
     /**
      * 根据understand得到的复杂度文件filename提取选择出的各实例的复杂度信息。
      *
-     * @param MetricFile
-     *            利用understand得到的各文件的复杂度文件，是一个单个文件。
+     * @param MetricFile 利用understand得到的各文件的复杂度文件，是一个单个文件。
      * @throws SQLException
      * @throws IOException
      */
@@ -364,25 +362,12 @@ public final class ExtractionMetrics extends Extraction {
     }
 
     @Override
-    public Map<List<Integer>, StringBuffer> getContentMap(
-            List<List<Integer>> someCommit_fileIds) throws SQLException {
-        if (contentMap==null) {
-            System.out.println("you need to run extraFromTxt first!");
-            return null;
-        }
-        Map<List<Integer>, StringBuffer> content=new LinkedHashMap<>();
-        List<Integer> title = new ArrayList<>();
-        title.add(-1);
-        title.add(-1);
-        content.put(title, contentMap.get(title));
-        for (List<Integer> list : someCommit_fileIds) {
-            content.put(list, contentMap.get(list));
-        }
-        return content;
+    public Map<List<Integer>, StringBuffer> getContentMap() throws SQLException {
+        return contentMap;
     }
 
     public static void main(String[] args) throws Exception {
-        ExtractionMetrics extractionMetrics =new ExtractionMetrics("MyFlink",1001, 1300);
+        ExtractionMetrics extractionMetrics = new ExtractionMetrics("MyFlink", 1001, 1300);
         extractionMetrics.recoverPreFile("flinkFiles");
     }
 }

@@ -20,9 +20,6 @@ public final class ExtractionMeta extends Extraction {
     private List<String> curAttributes;
     private List<List<Integer>> commit_file_inExtracion1;
     private String message;
-    public static String metaTableName = "metaHunk";
-    public static String metaTableNamekey = "MetaTableName";
-
 
     /**
      * 提取第一部分change info，s为指定开始的commit_id，e为结束的commit_id
@@ -34,23 +31,7 @@ public final class ExtractionMeta extends Extraction {
      */
     public ExtractionMeta(String database, int s, int e) throws Exception {
         super(database, s, e);
-    }
-
-    /**
-     * 加载配置文件中的相关设置,用于1.定义mataTable名称.
-     *
-     * @param propertyFilePath
-     * @throws IOException
-     */
-    public void loadProperty(String propertyFilePath) throws IOException {
-        Properties properties = new Properties();
-        File propertyFile = new File(propertyFilePath);
-        FileReader fReader = new FileReader(propertyFile);
-        properties.load(fReader);
-        if (properties.containsKey(metaTableNamekey)) {
-            metaTableName = properties.getProperty(metaTableNamekey);
-        }
-        logger.info("load database properties success!");
+        logger.info("Initial ExtractionMeta");
     }
 
     /**
@@ -1010,13 +991,8 @@ public final class ExtractionMeta extends Extraction {
     }
 
     @Override
-    public Map<List<Integer>, StringBuffer> getContentMap(
-            List<List<Integer>> someCommit_fileIds) throws SQLException {
+    public Map<List<Integer>, StringBuffer> getContentMap() throws SQLException {
         Map<List<Integer>, StringBuffer> content = new LinkedHashMap<>();
-        List<Integer> title = new ArrayList<>();
-        title.add(-1);
-        title.add(-1);
-        title.add(-1);
         StringBuffer titleBuffer = new StringBuffer();
         sql = "select * from " + metaTableName + " where id=1";
         resultSet = stmt.executeQuery(sql);
