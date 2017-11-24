@@ -39,16 +39,20 @@ public abstract class Extraction {
     public static String metaTableName = "metaHunk";
     public static String metaTableNamekey = "MetaTableName";
     public static boolean hasLoadProperty = false;
+    public static String hunksCacheKey = "cacheHunks";
+    public static String boolPropertyYes = "Yes";
+    public static Map<Integer, List<Integer>> hunksCache;
+    public static String databasePropertyPath = "src/main/resources/database.properties";
 
-    public Extraction(String database, int start, int end, String propertyPath) throws IOException, SQLException {
+    public Extraction(String database, int start, int end) throws IOException, SQLException {
         this.start = start;
         this.end = end;
         this.databaseName = database;
-        this.sqlL = SQLConnection.getConnection(database);
+        this.sqlL = SQLConnection.getConnection(database, databasePropertyPath);
         this.stmt = sqlL.getStmt();
         initialKeys();
         if (!hasLoadProperty) {
-            loadProperty(propertyPath);
+            loadProperty(databasePropertyPath);
         }
     }
 
@@ -58,13 +62,18 @@ public abstract class Extraction {
      * @param propertyFilePath
      * @throws IOException
      */
-    public void loadProperty(String propertyFilePath) throws IOException {
+    public void loadProperty(String propertyFilePath) throws IOException, SQLException {
         Properties properties = new Properties();
         File propertyFile = new File(propertyFilePath);
         FileReader fReader = new FileReader(propertyFile);
         properties.load(fReader);
         if (properties.containsKey(metaTableNamekey)) {
             metaTableName = properties.getProperty(metaTableNamekey);
+        }
+        if (properties.containsKey(hunksCacheKey)) {
+            if (properties.getProperty(hunksCacheKey).equals(boolPropertyYes)) {
+                getHunksCashe();
+            }
         }
         logger.info("load database properties success!");
     }
@@ -75,7 +84,7 @@ public abstract class Extraction {
      * @throws Exception
      */
     private void initialKeys() throws IllegalArgumentException, SQLException, IOException {
-        System.out.println("Initial keys!");
+        logger.info("Initial keys!");
         commit_ids = new ArrayList<>();
         commitIdPart = new ArrayList<>();
         commit_fileIds = new ArrayList<>();
@@ -153,4 +162,18 @@ public abstract class Extraction {
     public abstract Map<List<Integer>, StringBuffer> getContentMap(
             List<List<Integer>> someCommit_fileIds) throws SQLException;
 
+    public void getHunksCashe() throws SQLException {
+        for (List<Integer> commit_file_hunkId : commit_file_hunkIds) {
+            sql = "select old_start_line, old_end_line,new_start_line,new_end_line from hunks where " +
+                    "id=" + commit_file_hunkId.get(2);
+            resultSet = stmt.executeQuery(sql);
+            resultSet.next();
+            List<Integer> list = new ArrayList<>();
+            list.add(resultSet.getInt(1));
+            list.add(resultSet.getInt(2));
+            list.add(resultSet.getInt(3));
+            list.add(resultSet.getInt(4));
+            hunksCache.put(commit_file_hunkId.get(2), list);
+        }
+    }
 }
