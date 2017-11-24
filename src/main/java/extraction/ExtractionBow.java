@@ -1,55 +1,47 @@
 package extraction;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
+import org.apache.log4j.Logger;
+
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 提取源码信息路径信息。
- *
+ * <p>
  * id_commitId_fileIds
- *            由所有id、commit_id和file_id构成的主键列表。
+ * 由所有id、commit_id和file_id构成的主键列表。
  * dictionary
- *            存放实际属性名称和属性代号名称对的map。key值为实际属性名称。
+ * 存放实际属性名称和属性代号名称对的map。key值为实际属性名称。
  * dictionary2
- *            存放属性代号名称和实际属性名称对的map。
+ * 存放属性代号名称和实际属性名称对的map。
  * currStrings
- *            当前出现过的属性。
+ * 当前出现过的属性。
  * bow
- *            用以提取源码信息路径信息的词向量类。
+ * 用以提取源码信息路径信息的词向量类。
  * content
- *            实际得到的各实例，key为id_commitId_fileIds中的元素，value为对应的属性值。当key值为(-1,-1,-1)
- *            时对应的值为属性名称。
+ * 实际得到的各实例，key为id_commitId_fileIds中的元素，value为对应的属性值。当key值为(-1,-1,-1)
+ * 时对应的值为属性名称。
  * colMap
- *            content中属性及其索引的map。因为在持续更新实例中数据的过程中，某个实例的某个属性值可能需要改变
- *            则可根据此map快速对应到content中该属性的值，然后将其修改。
+ * content中属性及其索引的map。因为在持续更新实例中数据的过程中，某个实例的某个属性值可能需要改变
+ * 则可根据此map快速对应到content中该属性的值，然后将其修改。
  * headmap
- *            content中的属性字段，即存放所有属性名称的map。
- * @author niu
+ * content中的属性字段，即存放所有属性名称的map。
  *
+ * @author niu
  */
 public class ExtractionBow extends Extraction {
+    private static Logger logger = Logger.getLogger(ExtractionBow.class);
     Map<String, String> dictionary;
     Set<String> currStrings;
     Map<List<Integer>, StringBuffer> contentMap;
     Map<String, Integer> colMap;
-    List<Integer> headmap;
+    public static int patchNumStartIndex = 4;
 
     /**
      * 提取第三部分信息。
      *
-     * @param database
-     *            需要连接的数据库
+     * @param database    需要连接的数据库
      * @param projectHome
      * @param startId
      * @param endId
@@ -57,23 +49,19 @@ public class ExtractionBow extends Extraction {
      */
     //FIXME 由于setICFfromDatabase存在问题,本方法也有待改进.
     public ExtractionBow(String database, String projectHome, int startId,
-                         int endId) throws Exception {
-        super(database,startId,endId);
+                         int endId, String propertyPath) throws Exception {
+        super(database, startId, endId);
 
         dictionary = new HashMap<>();
         currStrings = new HashSet<>();
         contentMap = new LinkedHashMap<>();
         colMap = new HashMap<>();
-        headmap=new ArrayList<>();
-        headmap.add(-1);
-        headmap.add(-1);
-        contentMap.put(headmap, new StringBuffer());
-        //commit_fileIds=cf;
-        for (List<Integer> list : commit_fileIds) {
+        contentMap.put(title, new StringBuffer());
+        for (List<Integer> list : commit_file_hunkIds) {
             contentMap.put(list, new StringBuffer());
         }
         changeLogInfo();
-        sourceInfo(projectHome);
+        patchInfo();
         pathInfo();
     }
 
@@ -81,14 +69,11 @@ public class ExtractionBow extends Extraction {
      * 在content中针对指定的commit_id，更新属性s的值。
      * 此函数主要针对pathinfo和changelog，因为path信息或者changelog信息只与commit_id有关，与file_id无关。
      * 竟然是根据StringBuffer拆分的,效率太差了,应该用LinkedHashMap啊!
-     * @param s
-     *            属性名称。如果当前属性集中已有该属性，则对文件中每个实例更新该属性的值， 否则，向属性集中添加该属性，并初始化各属性值。
-     * @param tent
-     *            当前已有的信息。
-     * @param commitId
-     *            需要更新的实例的commit_id。
-     * @param value
-     *            需要更新的值。
+     *
+     * @param s        属性名称。如果当前属性集中已有该属性，则对文件中每个实例更新该属性的值， 否则，向属性集中添加该属性，并初始化各属性值。
+     * @param tent     当前已有的信息。
+     * @param commitId 需要更新的实例的commit_id。
+     * @param value    需要更新的值。
      * @return 更新内容后的content。
      */
     public Map<List<Integer>, StringBuffer> writeInfo(String s,
@@ -102,7 +87,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.put(headmap, tent.get(headmap).append(ColName + ","));
+                    tent.put(title, tent.get(title).append(ColName + ","));
                 } else if (list.get(0) == commitId) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -116,9 +101,7 @@ public class ExtractionBow extends Extraction {
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == commitId) {
                     StringBuffer newbuffer = new StringBuffer();
-                    String[] arrayStrings = tent.get(list).toString()
-                            .split(",");
-
+                    String[] arrayStrings = tent.get(list).toString().split(",");
                     for (int i = 0; i < index; i++) {
                         newbuffer.append(arrayStrings[i] + ",");
                     }
@@ -164,60 +147,82 @@ public class ExtractionBow extends Extraction {
      * 对应一个java文件。 同时其对应于一个patch。需要根据脚本语言提前获得所有这些更改了的文件，并通过数据库获得所有的patch信息
      * 然后使用此函数提取源码中的一些信息。
      *
-     * @param projectHome
-     *            包含所有需要提取信息的java源码的文件夹。
      * @throws SQLException
      * @throws IOException
      */
-    public void sourceInfo(String projectHome) throws SQLException, IOException {
-        System.out.println("extract source info.");
-        for (List<Integer> list : commit_fileIds) {
+    public void patchInfo() throws SQLException, IOException {
+        logger.info("extract source info.");
+        for (List<Integer> list : commit_file_hunkIds) {
+            int hunk_id = list.get(2);
+            int old_start_line = hunksCache.get(hunk_id).get(0);
+            int old_end_line = hunksCache.get(hunk_id).get(1);
+            int new_start_line = hunksCache.get(hunk_id).get(2);
+            int new_end_line = hunksCache.get(hunk_id).get(3);
             sql = "select patch from patches where commit_id="
                     + list.get(0) + " and file_id=" + list.get(1);
 
             resultSet = stmt.executeQuery(sql);
             String patchString = "";
             if (!resultSet.next()) {
-                System.out.println("patches in commit_id=" + list.get(0)
+                logger.debug("patches in commit_id=" + list.get(0)
                         + " and file_id=" + list.get(1) + " is empty!");
+                continue;
             } else {
                 patchString = resultSet.getString(1);
             }
-
-            StringBuffer sBuffer = new StringBuffer();
-            if (!patchString.equals("")) {
-                patchString = patchString.substring(
-                        patchString.indexOf("@"), patchString.length())
+            List<String> patches = new ArrayList<>();
+            int sIndex = patchString.indexOf("@@ -");
+            int eIndex = patchString.substring(sIndex + 1, patchString.length()).indexOf("@@ -");
+            while (eIndex != -1) {
+                patches.add(patchString.substring(sIndex, eIndex));
+                sIndex = eIndex;
+                eIndex = patchString.substring(sIndex + 1, patchString.length()).indexOf("@@ -");
+            }
+            patches.add(patchString.substring(sIndex));
+            for (String patch : patches) {
+                StringBuffer sBuffer = new StringBuffer();
+                int deviationP = 0;
+                int deviationS = 0;
+                int patchPlusStart = 0;
+                int patchSubStart = 0;
+                String[] nums = patch.substring(4, patch.lastIndexOf("@@")).replace(",", "")
+                        .replace("+", "").split(" ");
+                patch = patch.substring(patch.indexOf("@"), patch.length())
                         .replaceAll("@@.*@@", "");
-                for (String s : patchString.split("\\n{1,}")) {
-                    if (s.startsWith("+") || s.startsWith("-")) {
-                        s = s.substring(1, s.length()); // 写的太烂了
-                        sBuffer.append(s + "\n");
+                patchSubStart = Integer.parseInt(nums[0]);
+                deviationS = Integer.parseInt(nums[1]);
+                patchPlusStart = Integer.parseInt(nums[2]);
+                deviationP = Integer.parseInt(nums[3]);
+                boolean patchContainHunk = false;
+                if (old_start_line == 0 && patchPlusStart <= new_start_line && (patchPlusStart + deviationP) >= new_end_line) {
+                    patchContainHunk = true;
+                } else if (new_start_line == 0 && patchSubStart <= old_start_line && (patchSubStart + deviationS)
+                        >= old_end_line) {
+                    patchContainHunk = true;
+                } else if (patchPlusStart <= new_start_line && (patchPlusStart + deviationP) >= new_end_line) {
+                    patchContainHunk = true;
+                } else {
+                    patchContainHunk = false;
+                }
+
+                if (patchContainHunk) {
+                    for (String s : patch.split("\\n{1,}")) {
+                        if (s.startsWith("+") || s.startsWith("-")) {
+                            s = s.substring(1, s.length());
+                            sBuffer.append(s + "\n");
+                        } else {
+                            sBuffer.append(s);
+                        }
                     }
+                    break;
+                }
+                Map<String, Integer> patchMap = Bow.bowP(sBuffer);
+                for (String s : patchMap.keySet()) {
+                    contentMap = writeInfo(s, contentMap, list.get(0), list.get(1),
+                            patchMap.get(s));
                 }
             }
 
-            File sourceFile = new File(projectHome + "/" + list.get(0)
-                    + "_" + list.get(1) + ".java");
-            BufferedReader bReader;
-            try {
-                bReader = new BufferedReader(new FileReader(sourceFile));
-            } catch (FileNotFoundException e) {
-                System.out.println("Not find the file " + list.get(0) + "_"
-                        + list.get(1) + ".java");
-                continue;
-            }
-            String line;
-            while ((line = bReader.readLine()) != null) {
-                sBuffer.append(line + "\n");
-            }
-            bReader.close();
-            Map<String, Integer> patch = Bow.bowP(sBuffer);
-
-            for (String s : patch.keySet()) {
-                contentMap = writeInfo(s, contentMap, list.get(0), list.get(1),
-                        patch.get(s));
-            }
         }
     }
 
@@ -226,16 +231,11 @@ public class ExtractionBow extends Extraction {
      * 需要注意的是，这样的搭配导致extraction3提取的数据最后一个是逗号，
      * 导致weka无法识别，这个问题在Merge类的merge123()方法中处理。
      *
-     * @param s
-     *            需要更新的属性
-     * @param tent
-     *            需要更新的包含实例的实例集。
-     * @param commitId
-     *            需要更新的实例对应的commit_id。
-     * @param fileId
-     *            需要更新的实例对应的file_id。
-     * @param value
-     *            需要更新的值。
+     * @param s        需要更新的属性
+     * @param tent     需要更新的包含实例的实例集。
+     * @param commitId 需要更新的实例对应的commit_id。
+     * @param fileId   需要更新的实例对应的file_id。
+     * @param value    需要更新的值。
      * @return 新的实例集。
      */
     public Map<List<Integer>, StringBuffer> writeInfo(String s,
@@ -249,7 +249,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.get(headmap).append(ColName + ",");
+                    tent.get(title).append(ColName + ",");
                 } else if (list.get(0) == commitId && list.get(1) == fileId) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -285,13 +285,11 @@ public class ExtractionBow extends Extraction {
      * @throws IOException
      */
     public void pathInfo() throws SQLException, IOException {
-        System.out.println("extract path info.");
-        for (List<Integer> list : commit_fileIds) {
+        logger.info("extract path info.");
+        for (List<Integer> list : commit_file_hunkIds) {
             sql = "select current_file_path from actions where commit_id="
                     + list.get(0) + " and file_id=" + list.get(1);
-            // bow = new Bow();
             resultSet = stmt.executeQuery(sql);
-
             if (!resultSet.next()) {
                 continue;
             }
@@ -314,14 +312,10 @@ public class ExtractionBow extends Extraction {
     }
 
     @Override
-    public Map<List<Integer>, StringBuffer> getContentMap(
-            List<List<Integer>> someCommit_fileIds) throws SQLException {
-        Map<List<Integer>, StringBuffer> content=new LinkedHashMap<>();
-        List<Integer> title = new ArrayList<>();
-        title.add(-1);
-        title.add(-1);
+    public Map<List<Integer>, StringBuffer> getContentMap() throws SQLException {
+        Map<List<Integer>, StringBuffer> content = new LinkedHashMap<>();
         content.put(title, contentMap.get(title));
-        for (List<Integer> list : someCommit_fileIds) {
+        for (List<Integer> list : commit_file_hunkIds) {
             content.put(list, contentMap.get(list));
         }
         return content;
