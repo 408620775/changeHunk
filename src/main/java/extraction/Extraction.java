@@ -24,24 +24,25 @@ import java.util.*;
  */
 public abstract class Extraction {
     private static Logger logger = Logger.getLogger(ExtractionMeta.class);
-    public static String sql;
-    public static Statement stmt;
-    public static ResultSet resultSet;
     public static int start;
     public static int end;
-    public static List<List<Integer>> commit_fileIds;
-    public static List<Integer> commit_ids;
-    public static List<Integer> commitIdPart;
-    public static List<List<Integer>> commit_file_hunkIds;
-    public static List<Integer> title = Arrays.asList(-1, -1, -1);
-    public static SQLConnection sqlL;
+    public static String sql;
     public static String databaseName;
     public static String metaTableName = "metaHunk";
     public static String metaTableNamekey = "MetaTableName";
-    public static boolean hasLoadProperty = false;
     public static String hunksCacheKey = "cacheHunks";
-    public static String boolPropertyYes = "Yes";
-    public static Map<Integer, List<Integer>> hunksCache;
+    public static String stringPropertyYes = "Yes";
+    public static boolean hasLoadProperty = false;
+    public static boolean boolCacheHunk = true;
+    public static Statement stmt;
+    public static ResultSet resultSet;
+    public static SQLConnection sqlL;
+    public static List<Integer> commit_ids;
+    public static List<Integer> commitIdPart;
+    public static List<Integer> title = Arrays.asList(-1, -1, -1, -1);
+    public static List<List<Integer>> commit_fileIds;
+    public static List<List<Integer>> commit_file_patch_offset;
+    public static Map<List<Integer>, String> hunksCache;
     public static String databasePropertyPath = "src/main/resources/database.properties";
 
     public Extraction(String database, int start, int end) throws IOException, SQLException {
@@ -70,11 +71,6 @@ public abstract class Extraction {
         if (properties.containsKey(metaTableNamekey)) {
             metaTableName = properties.getProperty(metaTableNamekey);
         }
-        if (properties.containsKey(hunksCacheKey)) {
-            if (properties.getProperty(hunksCacheKey).equals(boolPropertyYes)) {
-                getHunksCashe();
-            }
-        }
         logger.info("load database properties success!");
     }
 
@@ -88,7 +84,8 @@ public abstract class Extraction {
         commit_ids = new ArrayList<>();
         commitIdPart = new ArrayList<>();
         commit_fileIds = new ArrayList<>();
-        commit_file_hunkIds = new ArrayList<>();
+        commit_file_patch_offset = new ArrayList<>();
+        hunksCache = new LinkedHashMap<>();
         sql = "select id from scmlog order by commit_date";
         resultSet = stmt.executeQuery(sql);
         while (resultSet.next()) {
@@ -121,36 +118,51 @@ public abstract class Extraction {
                 }
             }
             for (List<Integer> tmpCommit_fileId : tmpCommit_fileIds) {
-                sql = "select id from hunks where commit_id=" + tmpCommit_fileId.get(0) + " and "
+                sql = "select id,patch from patches where commit_id=" + tmpCommit_fileId.get(0) + " and "
                         + "file_id=" + tmpCommit_fileId.get(1);
                 resultSet = stmt.executeQuery(sql);
                 while (resultSet.next()) {
-                    List<Integer> list = new ArrayList<>();
-                    list.add(tmpCommit_fileId.get(0));
-                    list.add(tmpCommit_fileId.get(1));
-                    list.add(resultSet.getInt(1));
-                    commit_file_hunkIds.add(list);
+                    int commit_id = tmpCommit_fileId.get(0);
+                    int file_id = tmpCommit_fileId.get(1);
+                    int patch_id = resultSet.getInt(1);
+                    String patch = resultSet.getString(2);
+                    int offset = 0;
+                    if (patch.length() == 0) {
+                        logger.error("Patch is empty! commit_file_patch:" + commit_id + "_" + file_id + "_" + patch_id);
+                    }
+                    int sIndex = 0;
+                    int eIndex = patch.substring(sIndex + 1).indexOf("@@ -");
+                    while (eIndex != -1) {
+                        String hunkString = patch.substring(sIndex, eIndex);
+                        sIndex = eIndex;
+                        eIndex = patch.substring(sIndex + 1).indexOf("@@ -");
+                        List<Integer> list = new ArrayList<>();
+                        list.add(commit_id);
+                        list.add(file_id);
+                        list.add(patch_id);
+                        list.add(offset);
+                        offset++;
+                        commit_file_patch_offset.add(list);
+                        hunksCache.put(list, hunkString);
+                    }
+                    List<Integer> lastHunk = new ArrayList<>();
+                    lastHunk.add(commit_id);
+                    lastHunk.add(file_id);
+                    lastHunk.add(patch_id);
+                    lastHunk.add(offset);
+                    commit_file_patch_offset.add(lastHunk);
+                    hunksCache.put(lastHunk, patch.substring(sIndex));
                 }
             }
         }
-        logger.info("commit_fileIds are :");
-        StringBuilder sBuilder = new StringBuilder();
-        for (int i = 0; i < commit_fileIds.size(); i++) {
-            sBuilder.append("[" + commit_fileIds.get(i).get(0) + "," + commit_fileIds.get(i).get(1) + "] ");
-            if (i % 9 == 0 && i != 0) {
-                logger.info(sBuilder);
-                sBuilder = new StringBuilder();
+        logger.debug("commit_file_patch_offset and length of hunks are :");
+        for (List<Integer> integerList : hunksCache.keySet()) {
+            StringBuilder sBuilder = new StringBuilder();
+            for (Integer integer : integerList) {
+                sBuilder.append(integer + " ");
             }
+            logger.debug(sBuilder + ":" + hunksCache.get(integerList).length());
         }
-    }
-
-    /**
-     * 按时间序返回有效的commit_fileId列表。
-     *
-     * @return 按时间排序的指定范围内的commit_id列表。
-     */
-    public List<List<Integer>> getCommit_FileIds() {
-        return commit_fileIds;
     }
 
     /**
@@ -160,19 +172,4 @@ public abstract class Extraction {
      * @throws SQLException
      */
     public abstract Map<List<Integer>, StringBuffer> getContentMap() throws SQLException;
-
-    public void getHunksCashe() throws SQLException {
-        for (List<Integer> commit_file_hunkId : commit_file_hunkIds) {
-            sql = "select old_start_line, old_end_line,new_start_line,new_end_line from hunks where " +
-                    "id=" + commit_file_hunkId.get(2);
-            resultSet = stmt.executeQuery(sql);
-            resultSet.next();
-            List<Integer> list = new ArrayList<>();
-            list.add(resultSet.getInt(1));
-            list.add(resultSet.getInt(2));
-            list.add(resultSet.getInt(3));
-            list.add(resultSet.getInt(4));
-            hunksCache.put(commit_file_hunkId.get(2), list);
-        }
-    }
 }
