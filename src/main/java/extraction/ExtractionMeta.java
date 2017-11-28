@@ -31,7 +31,6 @@ public final class ExtractionMeta extends Extraction {
      */
     public ExtractionMeta(String database, int s, int e) throws Exception {
         super(database, s, e);
-        logger.info("Initial ExtractionMeta");
     }
 
     /**
@@ -41,7 +40,7 @@ public final class ExtractionMeta extends Extraction {
         long sTime = System.currentTimeMillis();
         CreateTable();
         long eTime = System.currentTimeMillis();
-        System.out.println("CreateTable() cost time:" + (eTime - sTime));
+        logger.info("CreateTable() cost time:" + (eTime - sTime));
         sTime = eTime;
         initial();
         eTime = System.currentTimeMillis();
@@ -94,35 +93,32 @@ public final class ExtractionMeta extends Extraction {
         boolean alreadyExist = false;
         while (resultSet.next()) {
             if (resultSet.getString(1).equals(metaTableName)) {
-                System.out.println("Already has the table: " + metaTableName);
-                System.out.println("Table will be uninstalled");
+                logger.info("Already has the table: " + metaTableName);
+                logger.info("Table will be uninstalled");
                 alreadyExist = true;
+                break;
             }
         }
         if (alreadyExist) {
             sql = "DROP TABLE " + metaTableName;
             int result = stmt.executeUpdate(sql);
             if (result != -1) {
-                System.out.println("Drop table successfully.");
+                logger.info("Drop table successfully.");
             } else {
-                System.out.println("Drop table fail.");
-                throw new SQLException();
+                logger.error("Drop table " + metaTableName + " fail.");
+                throw new SQLException("Drop table " + metaTableName + " fail.");
             }
         }
         sql = "create table " + metaTableName + "(id int(11) primary key not null auto_increment,commit_id int(11),"
-                + "file_id int(11), hunk_id int(11), author_name varchar(40),commit_day varchar(15),commit_hour int(2),"
-                + "cumulative_change_count int(15) default 0,cumulative_bug_count int(15) default 0,"
-                + "change_log_length int(5),changed_LOC int(7),"
-                + "sloc int(7),bug_introducing tinyint(1) default 0)";
+                + "file_id int(11), patch_id int(11), offset int(11), author_name varchar(40),commit_day varchar(15),"
+                + "commit_hour int(2),cumulative_change_count int(15) default 0,cumulative_bug_count int(15) default 0,"
+                + "change_log_length int(5),changed_LOC int(7),sloc int(7),bug_introducing tinyint(1) default 0)";
         int result = stmt.executeUpdate(sql);
         if (result != -1) {
-            message = "Create mateTable successfully.";
-            System.out.println(message);
-            logger.info(message);
+            logger.info("Create mateTable successfully.");
         } else {
-            message = "Failed to create mateTable.";
-            System.out.println(message);
-            logger.error(message);
+            logger.error("Failed to create mateTable.");
+            throw new SQLException("Failed to create mateTable.");
         }
     }
 
@@ -135,28 +131,34 @@ public final class ExtractionMeta extends Extraction {
      */
 
     public void initial() throws SQLException {
-        System.out.println("initial the table");
-        for (Integer integer : commit_ids) {
-            sql = "select hunks.commit_id,hunks.file_id,hunks.id,current_file_path from actions,hunks where " +
-                    "hunks.commit_id = " + integer + " and hunks.commit_id = actions.commit_id and hunks" +
-                    ".file_id=actions.file_id and type!='D'"; // 只选取java文件,同时排除测试文件。
-
+        logger.info("initial the table");
+        for (List<Integer> commit_file : commit_fileIds) {
+            sql = "select id,patch from patches where commit_id = " + commit_file.get(0) + " and file_id=" + commit_file
+                    .get(1);
             resultSet = stmt.executeQuery(sql);
             List<List<Integer>> list = new ArrayList<>();
             while (resultSet.next()) {
-                if (resultSet.getString(4).endsWith(".java")
-                        && (!resultSet.getString(4).toLowerCase()
-                        .contains("test"))) {
+                String patch = resultSet.getString(2);
+                int count = 0;
+                int sIndex = patch.indexOf("@@ -");
+                while (sIndex != -1) {
+                    count++;
+                    patch = patch.substring(4);
+                    sIndex = patch.indexOf("@@ -");
+                }
+                for (int i = 0; i < count; i++) {
                     List<Integer> temp = new ArrayList<>();
+                    temp.add(commit_file.get(0));
+                    temp.add(commit_file.get(1));
                     temp.add(resultSet.getInt(1));
-                    temp.add(resultSet.getInt(2));
-                    temp.add(resultSet.getInt(3));
+                    temp.add(i);
                     list.add(temp);
                 }
+
             }
             for (List<Integer> list2 : list) {
-                sql = "insert " + metaTableName + " (commit_id,file_id,hunk_id) values("
-                        + list2.get(0) + "," + list2.get(1) + "," + list2.get(2) + ")";
+                sql = "insert " + metaTableName + " (commit_id,file_id,patch_id,offset) values("
+                        + list2.get(0) + "," + list2.get(1) + "," + list2.get(2) + list2.get(3) + ")";
                 stmt.executeUpdate(sql);
             }
         }
