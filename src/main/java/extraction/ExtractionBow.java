@@ -47,9 +47,8 @@ public class ExtractionBow extends Extraction {
      * @param endId
      * @throws Exception
      */
-    //FIXME 由于setICFfromDatabase存在问题,本方法也有待改进.
     public ExtractionBow(String database, String projectHome, int startId,
-                         int endId, String propertyPath) throws Exception {
+                         int endId) throws Exception {
         super(database, startId, endId);
 
         dictionary = new HashMap<>();
@@ -57,7 +56,7 @@ public class ExtractionBow extends Extraction {
         contentMap = new LinkedHashMap<>();
         colMap = new HashMap<>();
         contentMap.put(title, new StringBuffer());
-        for (List<Integer> list : commit_file_hunkIds) {
+        for (List<Integer> list : commit_file_patch_offset) {
             contentMap.put(list, new StringBuffer());
         }
         changeLogInfo();
@@ -151,79 +150,27 @@ public class ExtractionBow extends Extraction {
      * @throws IOException
      */
     public void patchInfo() throws SQLException, IOException {
-        logger.info("extract source info.");
-        for (List<Integer> list : commit_file_hunkIds) {
-            int hunk_id = list.get(2);
-            int old_start_line = hunksCache.get(hunk_id).get(0);
-            int old_end_line = hunksCache.get(hunk_id).get(1);
-            int new_start_line = hunksCache.get(hunk_id).get(2);
-            int new_end_line = hunksCache.get(hunk_id).get(3);
-            sql = "select patch from patches where commit_id="
-                    + list.get(0) + " and file_id=" + list.get(1);
-
-            resultSet = stmt.executeQuery(sql);
-            String patchString = "";
-            if (!resultSet.next()) {
-                logger.debug("patches in commit_id=" + list.get(0)
-                        + " and file_id=" + list.get(1) + " is empty!");
-                continue;
-            } else {
-                patchString = resultSet.getString(1);
-            }
-            List<String> patches = new ArrayList<>();
-            int sIndex = patchString.indexOf("@@ -");
-            int eIndex = patchString.substring(sIndex + 1, patchString.length()).indexOf("@@ -");
-            while (eIndex != -1) {
-                patches.add(patchString.substring(sIndex, eIndex));
-                sIndex = eIndex;
-                eIndex = patchString.substring(sIndex + 1, patchString.length()).indexOf("@@ -");
-            }
-            patches.add(patchString.substring(sIndex));
-            for (String patch : patches) {
-                StringBuffer sBuffer = new StringBuffer();
-                int deviationP = 0;
-                int deviationS = 0;
-                int patchPlusStart = 0;
-                int patchSubStart = 0;
-                String[] nums = patch.substring(4, patch.lastIndexOf("@@")).replace(",", "")
-                        .replace("+", "").split(" ");
-                patch = patch.substring(patch.indexOf("@"), patch.length())
-                        .replaceAll("@@.*@@", "");
-                patchSubStart = Integer.parseInt(nums[0]);
-                deviationS = Integer.parseInt(nums[1]);
-                patchPlusStart = Integer.parseInt(nums[2]);
-                deviationP = Integer.parseInt(nums[3]);
-                boolean patchContainHunk = false;
-                if (old_start_line == 0 && patchPlusStart <= new_start_line && (patchPlusStart + deviationP) >= new_end_line) {
-                    patchContainHunk = true;
-                } else if (new_start_line == 0 && patchSubStart <= old_start_line && (patchSubStart + deviationS)
-                        >= old_end_line) {
-                    patchContainHunk = true;
-                } else if (patchPlusStart <= new_start_line && (patchPlusStart + deviationP) >= new_end_line) {
-                    patchContainHunk = true;
+        logger.info("Extract source info.");
+        for (List<Integer> list : commit_file_patch_offset) {
+            String patchString = hunksCache.get(list);
+            StringBuffer stringBuilder = new StringBuffer();
+            String[] lines = patchString.split("\n");
+            for (String line : lines) {
+                if (line.contains("@@ -")) {
+                    stringBuilder.append(line.substring(line.lastIndexOf("@@") + 2, line.length()));
+                } else if (line.startsWith("+") || line.startsWith("-")) {
+                    stringBuilder.append(line.substring(1));
                 } else {
-                    patchContainHunk = false;
-                }
-
-                if (patchContainHunk) {
-                    for (String s : patch.split("\\n{1,}")) {
-                        if (s.startsWith("+") || s.startsWith("-")) {
-                            s = s.substring(1, s.length());
-                            sBuffer.append(s + "\n");
-                        } else {
-                            sBuffer.append(s);
-                        }
-                    }
-                    break;
-                }
-                Map<String, Integer> patchMap = Bow.bowP(sBuffer);
-                for (String s : patchMap.keySet()) {
-                    contentMap = writeInfo(s, contentMap, list.get(0), list.get(1),
-                            patchMap.get(s));
+                    stringBuilder.append(line);
                 }
             }
-
+            Map<String, Integer> patchMap = Bow.bowP(stringBuilder);
+            for (String s : patchMap.keySet()) {
+                contentMap = writeInfo(s, contentMap, list.get(0), list.get(1), list.get(2), list.get(3),
+                        patchMap.get(s));
+            }
         }
+
     }
 
     /**
@@ -238,9 +185,8 @@ public class ExtractionBow extends Extraction {
      * @param value    需要更新的值。
      * @return 新的实例集。
      */
-    public Map<List<Integer>, StringBuffer> writeInfo(String s,
-                                                      Map<List<Integer>, StringBuffer> tent, int commitId, int fileId,
-                                                      Integer value) {
+    public Map<List<Integer>, StringBuffer> writeInfo(String s, Map<List<Integer>, StringBuffer> tent, int commitId,
+                                                      int fileId, int patch_id, int offset, int value) {
         if (!currStrings.contains(s)) {
             currStrings.add(s);
             String ColName = "s" + dictionary.size();
@@ -250,7 +196,7 @@ public class ExtractionBow extends Extraction {
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
                     tent.get(title).append(ColName + ",");
-                } else if (list.get(0) == commitId && list.get(1) == fileId) {
+                } else if (list.get(0) == commitId && list.get(1) == fileId && list.get(2) == patch_id && list.get(3) == offset) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
                     tent.put(list, tent.get(list).append(0 + ","));
@@ -259,7 +205,7 @@ public class ExtractionBow extends Extraction {
         } else {
             String column = dictionary.get(s);
             for (List<Integer> list : tent.keySet()) {
-                if (list.get(0) == commitId && list.get(1) == fileId) {
+                if (list.get(0) == commitId && list.get(1) == fileId && list.get(2) == patch_id && list.get(3) == offset) {
                     int index = colMap.get(column);
                     StringBuffer newbuffer = new StringBuffer();
                     String[] aStrings = tent.get(list).toString().split(",");
@@ -286,7 +232,7 @@ public class ExtractionBow extends Extraction {
      */
     public void pathInfo() throws SQLException, IOException {
         logger.info("extract path info.");
-        for (List<Integer> list : commit_file_hunkIds) {
+        for (List<Integer> list : commit_fileIds) {
             sql = "select current_file_path from actions where commit_id="
                     + list.get(0) + " and file_id=" + list.get(1);
             resultSet = stmt.executeQuery(sql);
@@ -302,6 +248,46 @@ public class ExtractionBow extends Extraction {
         }
     }
 
+    private Map<List<Integer>, StringBuffer> writeInfo(String s, Map<List<Integer>, StringBuffer> tent,
+                                                       int commit_id, int file_id, int value) {
+        if (!currStrings.contains(s)) {
+            currStrings.add(s);
+            String ColName = "s" + dictionary.size();
+            dictionary.put(s, ColName);
+            colMap.put(ColName, colMap.size());
+
+            for (List<Integer> list : tent.keySet()) {
+                if (list.get(0) == -1) {
+                    tent.get(title).append(ColName + ",");
+                } else if (list.get(0) == commit_id && list.get(1) == file_id) {
+                    tent.put(list, tent.get(list).append(value + ","));
+                } else {
+                    tent.put(list, tent.get(list).append(0 + ","));
+                }
+            }
+        } else {
+            String column = dictionary.get(s);
+            for (List<Integer> list : tent.keySet()) {
+                if (list.get(0) == commit_id && list.get(1) == file_id) {
+                    int index = colMap.get(column);
+                    StringBuffer newbuffer = new StringBuffer();
+                    String[] aStrings = tent.get(list).toString().split(",");
+                    for (int i = 0; i < index; i++) {
+                        newbuffer.append(aStrings[i] + ",");
+                    }
+                    int newValue = Integer.parseInt(aStrings[index] + value);
+                    newbuffer.append(newValue + ",");
+                    for (int i = index + 1; i < aStrings.length; i++) {
+                        newbuffer.append(aStrings[i] + ",");
+                    }
+                    tent.put(list, newbuffer);
+                }
+            }
+        }
+        return tent;
+    }
+
+
     /**
      * 获取文本解析后的字典.
      *
@@ -313,11 +299,6 @@ public class ExtractionBow extends Extraction {
 
     @Override
     public Map<List<Integer>, StringBuffer> getContentMap() throws SQLException {
-        Map<List<Integer>, StringBuffer> content = new LinkedHashMap<>();
-        content.put(title, contentMap.get(title));
-        for (List<Integer> list : commit_file_hunkIds) {
-            content.put(list, contentMap.get(list));
-        }
-        return content;
+        return contentMap;
     }
 }
