@@ -85,11 +85,12 @@ public abstract class Extraction {
         commitIdPart = new ArrayList<>();
         commit_fileIds = new ArrayList<>();
         commit_file_patch_offset = new ArrayList<>();
+        List<Integer> all_commits = new ArrayList<>();
         hunksCache = new LinkedHashMap<>();
         sql = "select id from scmlog order by commit_date";
         resultSet = stmt.executeQuery(sql);
         while (resultSet.next()) {
-            commit_ids.add(resultSet.getInt(1));
+            all_commits.add(resultSet.getInt(1));
         }
         if (start < 0) {
             logger.error("start commit_id can't be less 0!");
@@ -100,10 +101,10 @@ public abstract class Extraction {
             throw new IllegalArgumentException(
                     "end is larger than the total number of commits!");
         }
-        for (int i = start - 1; i < end; i++) {
+        for (int i = 0; i < all_commits.size(); i++) {
             sql = "select file_id,current_file_path from actions where commit_id="
-                    + commit_ids.get(i) + " and type!='D'";
-            commitIdPart.add(commit_ids.get(i));
+                    + all_commits.get(i) + " and type!='D'";
+            boolean vaildOperation = false;
             resultSet = stmt.executeQuery(sql);
             List<List<Integer>> tmpCommit_fileIds = new ArrayList<>();
             while (resultSet.next()) {
@@ -115,15 +116,22 @@ public abstract class Extraction {
                     tmp.add(resultSet.getInt(1));
                     commit_fileIds.add(tmp);
                     tmpCommit_fileIds.add(tmp);
+                    vaildOperation = true;
+                }
+            }
+            if (vaildOperation) {
+                commit_ids.add(all_commits.get(i));
+                if (i + 1 >= start && i + 1 <= end) {
+                    commitIdPart.add(all_commits.get(i));
                 }
             }
             for (List<Integer> tmpCommit_fileId : tmpCommit_fileIds) {
                 sql = "select id,patch from patches where commit_id=" + tmpCommit_fileId.get(0) + " and "
                         + "file_id=" + tmpCommit_fileId.get(1);
                 resultSet = stmt.executeQuery(sql);
+                int commit_id = tmpCommit_fileId.get(0);
+                int file_id = tmpCommit_fileId.get(1);
                 while (resultSet.next()) {
-                    int commit_id = tmpCommit_fileId.get(0);
-                    int file_id = tmpCommit_fileId.get(1);
                     int patch_id = resultSet.getInt(1);
                     String patch = resultSet.getString(2);
                     int offset = 0;
