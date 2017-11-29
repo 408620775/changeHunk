@@ -108,15 +108,19 @@ public abstract class Extraction {
             resultSet = stmt.executeQuery(sql);
             List<List<Integer>> tmpCommit_fileIds = new ArrayList<>();
             while (resultSet.next()) {
+                boolean vaildFile_id = false;
                 String current_file_path = resultSet.getString(2);
                 if (current_file_path.endsWith(".java")
                         && (!current_file_path.toLowerCase().contains("test"))) {
+                    vaildOperation = true;
+                    vaildFile_id = true;
+                }
+                if (vaildFile_id && i + 1 >= start && i + 1 <= end) {
                     List<Integer> tmp = new ArrayList<>();
                     tmp.add(commit_ids.get(i));
                     tmp.add(resultSet.getInt(1));
                     commit_fileIds.add(tmp);
                     tmpCommit_fileIds.add(tmp);
-                    vaildOperation = true;
                 }
             }
             if (vaildOperation) {
