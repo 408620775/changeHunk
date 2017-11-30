@@ -56,7 +56,7 @@ public class ExtractionBow extends Extraction {
         contentMap = new LinkedHashMap<>();
         colMap = new HashMap<>();
         contentMap.put(title, new StringBuffer());
-        for (List<Integer> list : commit_file_patch_offset) {
+        for (List<Integer> list : commit_file_patch_offset_part) {
             contentMap.put(list, new StringBuffer());
         }
         changeLogInfo();
@@ -125,7 +125,7 @@ public class ExtractionBow extends Extraction {
      */
     public void changeLogInfo() throws SQLException, IOException {
         System.out.println("extract changLog info.");
-        for (Integer commitId : commitIdPart) {
+        for (Integer commitId : commit_parts) {
             if (commitId != -1) {
                 sql = "select message from scmlog where id=" + commitId;
                 resultSet = stmt.executeQuery(sql);
@@ -151,8 +151,8 @@ public class ExtractionBow extends Extraction {
      */
     public void patchInfo() throws SQLException, IOException {
         logger.info("Extract source info.");
-        for (List<Integer> list : commit_file_patch_offset) {
-            String patchString = hunksCache.get(list);
+        for (List<Integer> list : commit_file_patch_offset_part) {
+            String patchString = hunks_cache_part.get(list);
             StringBuffer stringBuilder = new StringBuffer();
             String[] lines = patchString.split("\n");
             for (String line : lines) {
@@ -232,7 +232,7 @@ public class ExtractionBow extends Extraction {
      */
     public void pathInfo() throws SQLException, IOException {
         logger.info("extract path info.");
-        for (List<Integer> list : commit_fileIds) {
+        for (List<Integer> list : commit_file_parts) {
             sql = "select current_file_path from actions where commit_id="
                     + list.get(0) + " and file_id=" + list.get(1);
             resultSet = stmt.executeQuery(sql);

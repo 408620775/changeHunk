@@ -70,10 +70,10 @@ public class FileOperation {
         StringBuffer resBuffer = new StringBuffer();
         for (List<Integer> key : map.keySet()) {
             if (key.get(0)==-1) {
-                resBuffer.append("commit_id").append(",").append("file_id")
+                resBuffer.append("commit_id").append(",").append("file_id").append(",").append("hunk_id")
                         .append(",").append(map.get(key)).append("\n");
             }else {
-                resBuffer.append(key.get(0)).append(",").append(key.get(1))
+                resBuffer.append(key.get(0)).append(",").append(key.get(1)).append(",").append(key.get(2))
                         .append(",").append(map.get(key)).append("\n");
             }
         }

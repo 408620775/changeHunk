@@ -44,7 +44,7 @@ public final class ExtractionMeta extends Extraction {
         sTime = eTime;
         initial();
         eTime = System.currentTimeMillis();
-        System.out.println("initial() cost time:" + (eTime - sTime));
+        logger.info("initial() cost time:" + (eTime - sTime));
         sTime = eTime;
         bug_introducing();
         eTime = System.currentTimeMillis();
@@ -132,35 +132,10 @@ public final class ExtractionMeta extends Extraction {
 
     public void initial() throws SQLException {
         logger.info("initial the table");
-        for (List<Integer> commit_file : commit_fileIds) {
-            sql = "select id,patch from patches where commit_id = " + commit_file.get(0) + " and file_id=" + commit_file
-                    .get(1);
-            resultSet = stmt.executeQuery(sql);
-            List<List<Integer>> list = new ArrayList<>();
-            while (resultSet.next()) {
-                String patch = resultSet.getString(2);
-                int count = 0;
-                int sIndex = patch.indexOf("@@ -");
-                while (sIndex != -1) {
-                    count++;
-                    patch = patch.substring(4);
-                    sIndex = patch.indexOf("@@ -");
-                }
-                for (int i = 0; i < count; i++) {
-                    List<Integer> temp = new ArrayList<>();
-                    temp.add(commit_file.get(0));
-                    temp.add(commit_file.get(1));
-                    temp.add(resultSet.getInt(1));
-                    temp.add(i);
-                    list.add(temp);
-                }
-
-            }
-            for (List<Integer> list2 : list) {
-                sql = "insert " + metaTableName + " (commit_id,file_id,patch_id,offset) values("
-                        + list2.get(0) + "," + list2.get(1) + "," + list2.get(2) + list2.get(3) + ")";
-                stmt.executeUpdate(sql);
-            }
+        for (List<Integer> key : hunks_indexs.keySet()) {
+            sql = "insert " + metaTableName + " (commit_id,file_id,patch_id,offset) values("
+                    + key.get(0) + "," + key.get(1) + "," + key.get(2) + key.get(3) + ")";
+            stmt.executeUpdate(sql);
         }
     }
 
@@ -202,9 +177,9 @@ public final class ExtractionMeta extends Extraction {
     public void author_name(boolean excuteAll) throws SQLException {
         List<Integer> excuteList;
         if (excuteAll) {
-            excuteList = commit_ids;
+            excuteList = commits;
         } else {
-            excuteList = commitIdPart;
+            excuteList = commit_parts;
         }
         System.out.println("get author_name");
         for (Integer integer : excuteList) {
@@ -225,9 +200,9 @@ public final class ExtractionMeta extends Extraction {
         System.out.println("get commit_day");
         List<Integer> excuteList;
         if (excuteAll) {
-            excuteList = commit_ids;
+            excuteList = commits;
         } else {
-            excuteList = commitIdPart;
+            excuteList = commit_parts;
         }
         Map<Integer, String> mapD = new HashMap<>(); // 加入修改日期
         for (Integer integer : excuteList) {
@@ -269,9 +244,9 @@ public final class ExtractionMeta extends Extraction {
         System.out.println("get commit_hour");
         List<Integer> excuteList;
         if (excuteAll) {
-            excuteList = commit_ids;
+            excuteList = commits;
         } else {
-            excuteList = commitIdPart;
+            excuteList = commit_parts;
         }
         Map<Integer, Integer> mapH = new HashMap<>(); // 加入修改时间
         for (Integer integer : excuteList) {
@@ -304,9 +279,9 @@ public final class ExtractionMeta extends Extraction {
         System.out.println("get change log length");
         List<Integer> excuteList;
         if (excuteAll) {
-            excuteList = commit_ids;
+            excuteList = commits;
         } else {
-            excuteList = commitIdPart;
+            excuteList = commit_parts;
         }
         for (Integer integer : excuteList) {
             sql = "select message from scmlog where id=" + integer;
@@ -461,9 +436,9 @@ public final class ExtractionMeta extends Extraction {
         System.out.println("get changed loc");
         List<Integer> excuteList;
         if (excuteAll) {
-            excuteList = commit_ids;
+            excuteList = commits;
         } else {
-            excuteList = commitIdPart;
+            excuteList = commit_parts;
         }
         List<Integer> hunk_ids = new ArrayList<>();
         for (Integer integer : excuteList) {
@@ -503,43 +478,82 @@ public final class ExtractionMeta extends Extraction {
      * @throws SQLException
      */
     public void bug_introducing() throws SQLException {
-        System.out.println("get bug introducing");
-        sql = "select " + metaTableName + ".commit_id," + metaTableName + ".file_id,hunk_id,old_start_line,old_end_line"
-                + " from " + metaTableName + ",scmlog,hunks where " + metaTableName
-                + ".commit_id=scmlog.id and is_bug_fix=1 and hunk_id=hunks.id";
-        resultSet = stmt.executeQuery(sql);
-        List<List<Integer>> bugFixFileHunkIds = new ArrayList<>();
-        while (resultSet.next()) {
-            List<Integer> tmp = new ArrayList<>();
-            tmp.add(resultSet.getInt(1));
-            tmp.add(resultSet.getInt(2));
-            tmp.add(resultSet.getInt(3));
-            tmp.add(resultSet.getInt(4));
-            tmp.add(resultSet.getInt(5));
-            bugFixFileHunkIds.add(tmp);
-        }
-        for (List<Integer> id_list : bugFixFileHunkIds) {
-            sql = "select hunks.id,new_start_line,new_end_line from hunks where "
-                    + "commit_id IN (select bug_commit_id from hunk_blames where hunk_id=" + id_list.get(2) + ") and "
-                    + "file_id=" + id_list.get(1);
-            resultSet = stmt.executeQuery(sql);
-            List<Integer> bug_hunk_ids = new ArrayList<>();
-            while (resultSet.next()) {
-                int lastHunkId = resultSet.getInt(1);
-                int lastHunkStart = resultSet.getInt(2);
-                int lastHunkEnd = resultSet.getInt(3);
-                if (id_list.get(3) < lastHunkEnd || id_list.get(4) > lastHunkStart) {
-                    continue;
-                } else {
-                    bug_hunk_ids.add(lastHunkId);
+        logger.info("get bug introducing");
+        Map<Integer, Boolean> commitId_isBugFix = new HashMap<>();
+        for (List<Integer> commit_file : commit_files) {
+            int commit_id = commit_file.get(0);
+            int file_id = commit_file.get(1);
+            boolean is_bug_fix = false;
+            if (commitId_isBugFix.containsKey(commit_id)) {
+                is_bug_fix = commitId_isBugFix.get(commit_id);
+            } else {
+                sql = "select is_bug_fix from scmlog where id=" + commit_id;
+                while (resultSet.next()) {
+                    if (resultSet.getInt(1) == 1) {
+                        is_bug_fix = true;
+                    }
                 }
+                commitId_isBugFix.put(commit_id, is_bug_fix);
             }
-            for (Integer bug_hunk_id : bug_hunk_ids) {
-                sql = "update " + metaTableName + " set bug_introducing=1 where " + metaTableName + "" +
-                        ".hunk_id=" + bug_hunk_id;
+            if (!is_bug_fix) {
+                continue;
+            }
+            sql = "select id,old_start_line,old_end_line,new_start_line,new_end_line from hunks where commit_id="
+                    + commit_id + " and file_id=" + file_id;
+            List<List<Integer>> fake_hunk_id_ranges = new ArrayList<>();
+            resultSet = stmt.executeQuery(sql);
+            while (resultSet.next()) {
+                if (resultSet.getInt(3) == 0) { //old_end_line is 0, without a corresponding line.
+                    continue;
+                }
+                List<Integer> id_lineIndex = new ArrayList<>();
+                id_lineIndex.add(resultSet.getInt(1));
+                id_lineIndex.add(resultSet.getInt(2));
+                id_lineIndex.add(resultSet.getInt(3));
+                id_lineIndex.add(resultSet.getInt(4));
+                id_lineIndex.add(resultSet.getInt(5));
+                fake_hunk_id_ranges.add(id_lineIndex);
+            }
+            for (List<Integer> fake_hunk_id_range : fake_hunk_id_ranges) {
+                sql = "select bug_commit_id from hunk_blames where hunk_id=" + fake_hunk_id_range.get(0);
+                int bug_commit_id = -1;
+                resultSet = stmt.executeQuery(sql);
+                while (resultSet.next()) {
+                    bug_commit_id = resultSet.getInt(1);
+                }
+                if (bug_commit_id == -1) {
+                    logger.debug("bug_commit_id for fake_hunk " + fake_hunk_id_range + " is empty but the commit which contains" +
+                            " fake_hunk " + fake_hunk_id_range + " is bug_fix!");
+                    continue;
+                }
+                sql = "select patch_id,offset from " + metaTableName + " where commit_id=" + bug_commit_id + " and file_id=" + file_id;
+                resultSet = stmt.executeQuery(sql);
+                List<Integer> matchKey = null;
+                while (resultSet.next()) {
+                    List<Integer> key = new ArrayList<>();
+                    key.add(bug_commit_id);
+                    key.add(file_id);
+                    key.add(resultSet.getInt(1));
+                    key.add(resultSet.getInt(2));
+                    if (!hunks_indexs.containsKey(key)) {
+                        logger.error("hunks_index don't contain the key:" + underLineFormat(key));
+                        continue;
+                    }
+                    int[] start_offset = hunks_indexs.get(key);
+                    if (fake_hunk_id_range.get(1) >= start_offset[2] && fake_hunk_id_range.get(2)
+                            <= start_offset[2] + start_offset[3]) {
+                        matchKey = key;
+                        break;
+                    }
+                }
+                if (matchKey == null) {
+                    logger.error("fake_hunk_id:" + fake_hunk_id_range.get(0) + " don't hava a matched old hunk!");
+                }
+                //need up speed.
+                sql = "update " + metaTableName + " set bug_introducing=1 where commit_id=" + matchKey.get(0) + " and "
+                        + "file_id=" + matchKey.get(1) + " and patch_id=" + matchKey.get(2) + " and offset=" + matchKey.get(3);
                 stmt.executeUpdate(sql);
             }
-
         }
     }
 
@@ -556,7 +570,7 @@ public final class ExtractionMeta extends Extraction {
      */
     public void just_in_time(String gitFile) throws SQLException,
             ParseException, IOException, InterruptedException {
-        diffusion(false);
+        diffusion();
         size(false);
         purpose(false);
         history(gitFile);
@@ -570,7 +584,7 @@ public final class ExtractionMeta extends Extraction {
      *
      * @throws SQLException
      */
-    public void diffusion(boolean excuteAll) throws SQLException {
+    public void diffusion() throws SQLException {
         System.out.println("Update Diffusion");
         if (curAttributes == null) {
             obtainCurAttributes();
@@ -583,23 +597,12 @@ public final class ExtractionMeta extends Extraction {
             curAttributes.add("nf");
             curAttributes.add("entropy");
         }
-
-        List<List<Integer>> executeList = null;
-        if (excuteAll == true) {
-            if (commit_file_inExtracion1 == null) {
-                obtainCFidInExtraction1();
-            }
-            executeList = commit_file_inExtracion1;
-        } else {
-            executeList = commit_fileIds;
-        }
-
-        for (List<Integer> commit_fileId : executeList) {
+        for (Integer commit_id : commit_parts) {
             Set<String> subsystem = new HashSet<>();
             Set<String> directories = new HashSet<>();
             Set<String> files = new HashSet<>();
             sql = "select current_file_path from actions where commit_id="
-                    + commit_fileId.get(0);
+                    + commit_id;
             resultSet = stmt.executeQuery(sql);
             while (resultSet.next()) {
                 String pString = resultSet.getString(1);
@@ -615,7 +618,7 @@ public final class ExtractionMeta extends Extraction {
                 }
             }
             sql = "select changed_LOC from " + metaTableName + " where commit_id="
-                    + commit_fileId.get(0);
+                    + commit_id;
             resultSet = stmt.executeQuery(sql);
             List<Integer> changeOfFile = new ArrayList<>();
             while (resultSet.next()) {
@@ -635,7 +638,7 @@ public final class ExtractionMeta extends Extraction {
             }
             sql = "UPDATE " + metaTableName + " SET ns=" + subsystem.size() + ",nd="
                     + directories.size() + ",nf=" + files.size() + ",entropy="
-                    + entropy + " where commit_id=" + commit_fileId.get(0);
+                    + entropy + " where commit_id=" + commit_id;
             stmt.executeUpdate(sql);
         }
     }
@@ -669,7 +672,7 @@ public final class ExtractionMeta extends Extraction {
             }
             executeList = commit_file_inExtracion1;
         } else {
-            executeList = commit_fileIds;
+            executeList = commit_file_parts;
         }
         for (List<Integer> list : executeList) {
             sql = "select old_start_line,old_end_line,new_start_line,new_end_line,id from hunks where commit_id="
@@ -773,7 +776,7 @@ public final class ExtractionMeta extends Extraction {
             }
             executeList = commit_file_inExtracion1;
         } else {
-            executeList = commit_fileIds;
+            executeList = commit_file_parts;
         }
 
         for (List<Integer> list : executeList) {
@@ -927,7 +930,7 @@ public final class ExtractionMeta extends Extraction {
      */
     private void obtainCFidInExtraction1() throws SQLException {
         commit_file_inExtracion1 = new ArrayList<>();
-        for (Integer integer : commitIdPart) {
+        for (Integer integer : commit_parts) {
             sql = "select extraction1.commit_id,extraction1.file_id from extraction1,actions where extraction1.commit_id="
                     + integer
                     + " and extraction1.commit_id=actions.commit_id and extraction1.file_id=actions.file_id and type!='D'";
@@ -1000,24 +1003,24 @@ public final class ExtractionMeta extends Extraction {
         resultSet = stmt.executeQuery(sql);
         int colcount = resultSet.getMetaData().getColumnCount();
         int labelIndex = 0;
-        for (int i = 5; i <= colcount; i++) {
+        for (int i = title.size() + 2; i <= colcount; i++) {
             String colName = resultSet.getMetaData().getColumnName(i);
             titleBuffer.append(colName + ",");
         }
         content.put(title, titleBuffer);
 
-        for (List<Integer> commit_file_hunkId : commit_file_hunkIds) {
+        for (List<Integer> commit_file_patch_offest : commit_file_patch_offset_part) {
             StringBuffer temp = new StringBuffer();
-            sql = "select * from " + metaTableName + " where commit_id="
-                    + commit_file_hunkId.get(0) + " and file_id="
-                    + commit_file_hunkId.get(1) + " and hunk_id=" + commit_file_hunkId.get(2);
+            sql = "select * from " + metaTableName + " where commit_id=" + commit_file_patch_offest.get(0) + " and file_id="
+                    + commit_file_patch_offest.get(1) + " and patch_id=" + commit_file_patch_offest.get(2) + " and " +
+                    "offset=" + commit_file_patch_offest.get(3);
             resultSet = stmt.executeQuery(sql);
             int colCount = resultSet.getMetaData().getColumnCount();
             resultSet.next();
-            for (int i = 5; i <= colCount; i++) {
+            for (int i = title.size() + 2; i <= colCount; i++) {
                 temp.append(resultSet.getString(i) + ",");
             }
-            content.put(commit_file_hunkId, temp);
+            content.put(commit_file_patch_offest, temp);
         }
         return content;
     }
@@ -1027,12 +1030,12 @@ public final class ExtractionMeta extends Extraction {
         int maxId = Integer.MIN_VALUE;
         int total = 0;
         int bug = 0;
-        sql = "select min(id) from " + metaTableName + " where commit_id=" + commitIdPart.get(0);
+        sql = "select min(id) from " + metaTableName + " where commit_id=" + commit_parts.get(0);
         resultSet = stmt.executeQuery(sql);
         while (resultSet.next()) {
             minId = resultSet.getInt(1);
         }
-        sql = "select max(id) from " + metaTableName + " where commit_id=" + commitIdPart.get(commitIdPart.size() - 1);
+        sql = "select max(id) from " + metaTableName + " where commit_id=" + commit_parts.get(commit_parts.size() - 1);
         resultSet = stmt.executeQuery(sql);
         while (resultSet.next()) {
             maxId = resultSet.getInt(1);

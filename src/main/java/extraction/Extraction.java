@@ -30,19 +30,18 @@ public abstract class Extraction {
     public static String databaseName;
     public static String metaTableName = "metaHunk";
     public static String metaTableNamekey = "MetaTableName";
-    public static String hunksCacheKey = "cacheHunks";
-    public static String stringPropertyYes = "Yes";
     public static boolean hasLoadProperty = false;
-    public static boolean boolCacheHunk = true;
     public static Statement stmt;
     public static ResultSet resultSet;
     public static SQLConnection sqlL;
-    public static List<Integer> commit_ids;
-    public static List<Integer> commitIdPart;
+    public static List<Integer> commits;
+    public static List<Integer> commit_parts;
     public static List<Integer> title = Arrays.asList(-1, -1, -1, -1);
-    public static List<List<Integer>> commit_fileIds;
-    public static List<List<Integer>> commit_file_patch_offset;
-    public static Map<List<Integer>, String> hunksCache;
+    public static List<List<Integer>> commit_file_parts;
+    public static List<List<Integer>> commit_files;
+    public static List<List<Integer>> commit_file_patch_offset_part;
+    public static Map<List<Integer>, String> hunks_cache_part;
+    public static Map<List<Integer>, int[]> hunks_indexs;
     public static String databasePropertyPath = "src/main/resources/database.properties";
 
     public Extraction(String database, int start, int end) throws IOException, SQLException {
@@ -81,12 +80,13 @@ public abstract class Extraction {
      */
     private void initialKeys() throws IllegalArgumentException, SQLException, IOException {
         logger.info("Initial keys!");
-        commit_ids = new ArrayList<>();
-        commitIdPart = new ArrayList<>();
-        commit_fileIds = new ArrayList<>();
-        commit_file_patch_offset = new ArrayList<>();
+        commits = new ArrayList<>();
+        commit_parts = new ArrayList<>();
+        commit_file_parts = new ArrayList<>();
+        commit_file_patch_offset_part = new ArrayList<>();
+        hunks_indexs = new LinkedHashMap<>();
         List<Integer> all_commits = new ArrayList<>();
-        hunksCache = new LinkedHashMap<>();
+        hunks_cache_part = new LinkedHashMap<>();
         sql = "select id from scmlog order by commit_date";
         resultSet = stmt.executeQuery(sql);
         while (resultSet.next()) {
@@ -96,7 +96,7 @@ public abstract class Extraction {
             logger.error("start commit_id can't be less 0!");
             throw new IllegalArgumentException("start commit_id can't be less 0!");
         }
-        if (end > commit_ids.size()) {
+        if (end > commits.size()) {
             logger.error("end is larger than the total number of commits!");
             throw new IllegalArgumentException(
                     "end is larger than the total number of commits!");
@@ -115,18 +115,21 @@ public abstract class Extraction {
                     vaildOperation = true;
                     vaildFile_id = true;
                 }
-                if (vaildFile_id && i + 1 >= start && i + 1 <= end) {
+                if (vaildFile_id) {
                     List<Integer> tmp = new ArrayList<>();
-                    tmp.add(commit_ids.get(i));
+                    tmp.add(commits.get(i));
                     tmp.add(resultSet.getInt(1));
-                    commit_fileIds.add(tmp);
+                    commit_files.add(tmp);
                     tmpCommit_fileIds.add(tmp);
+                    if (i + 1 >= start && i + 1 <= end) {
+                        commit_file_parts.add(tmp);
+                    }
                 }
             }
             if (vaildOperation) {
-                commit_ids.add(all_commits.get(i));
+                commits.add(all_commits.get(i));
                 if (i + 1 >= start && i + 1 <= end) {
-                    commitIdPart.add(all_commits.get(i));
+                    commit_parts.add(all_commits.get(i));
                 }
             }
             for (List<Integer> tmpCommit_fileId : tmpCommit_fileIds) {
@@ -146,6 +149,7 @@ public abstract class Extraction {
                     int eIndex = patch.substring(sIndex + 1).indexOf("@@ -");
                     while (eIndex != -1) {
                         String hunkString = patch.substring(sIndex, eIndex);
+                        int[] ranges = parseHunkRange(hunkString);
                         sIndex = eIndex;
                         eIndex = patch.substring(sIndex + 1).indexOf("@@ -");
                         List<Integer> list = new ArrayList<>();
@@ -153,28 +157,49 @@ public abstract class Extraction {
                         list.add(file_id);
                         list.add(patch_id);
                         list.add(offset);
+                        hunks_indexs.put(list, ranges);
                         offset++;
-                        commit_file_patch_offset.add(list);
-                        hunksCache.put(list, hunkString);
+                        if (i + 1 >= start && i + 1 <= end) {
+                            commit_file_patch_offset_part.add(list);
+                            hunks_cache_part.put(list, hunkString);
+                        }
                     }
+                    String hunkString = patch.substring(sIndex);
+                    int[] ranges = parseHunkRange(hunkString);
                     List<Integer> lastHunk = new ArrayList<>();
                     lastHunk.add(commit_id);
                     lastHunk.add(file_id);
                     lastHunk.add(patch_id);
                     lastHunk.add(offset);
-                    commit_file_patch_offset.add(lastHunk);
-                    hunksCache.put(lastHunk, patch.substring(sIndex));
+                    hunks_indexs.put(lastHunk, ranges);
+                    if (i + 1 >= start && i + 1 <= end) {
+                        commit_file_patch_offset_part.add(lastHunk);
+                        hunks_cache_part.put(lastHunk, patch.substring(sIndex));
+                    }
                 }
             }
         }
-        logger.debug("commit_file_patch_offset and length of hunks are :");
-        for (List<Integer> integerList : hunksCache.keySet()) {
+        logger.debug("commit_file_patch_offset_part and length of hunks are :");
+        for (List<Integer> integerList : hunks_cache_part.keySet()) {
             StringBuilder sBuilder = new StringBuilder();
             for (Integer integer : integerList) {
                 sBuilder.append(integer + " ");
             }
-            logger.debug(sBuilder + ":" + hunksCache.get(integerList).length());
+            logger.debug(sBuilder + ":" + hunks_cache_part.get(integerList).length());
         }
+    }
+
+    public int[] parseHunkRange(String hunkString) {
+        String range = hunkString.substring(hunkString.indexOf("-") + 1, hunkString.lastIndexOf("@@"))
+                .replace(",", " ").replace("+", "");
+        String[] numString = range.split(" ");
+        int neg_hunk_start_index = Integer.parseInt(numString[0]);
+        int neg_hunk_offset_index = Integer.parseInt(numString[1]);
+        int pos_hunk_start_index = Integer.parseInt(numString[2]);
+        int pos_hunk_offset_index = Integer.parseInt(numString[3]);
+        int[] res = new int[]{neg_hunk_start_index, neg_hunk_offset_index, pos_hunk_start_index,
+                pos_hunk_offset_index};
+        return res;
     }
 
     /**
@@ -184,4 +209,16 @@ public abstract class Extraction {
      * @throws SQLException
      */
     public abstract Map<List<Integer>, StringBuffer> getContentMap() throws SQLException;
+
+    public String underLineFormat(List<Integer> list) {
+        if (list == null || list.size() == 0) {
+            return "";
+        }
+        StringBuffer sBuffer = new StringBuffer();
+        sBuffer.append(list.get(0));
+        for (int i = 1; i < list.size(); i++) {
+            sBuffer.append("_" + list.get(i));
+        }
+        return sBuffer.toString();
+    }
 }

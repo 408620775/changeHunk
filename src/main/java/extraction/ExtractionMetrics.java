@@ -1,5 +1,7 @@
 package extraction;
 
+import org.apache.log4j.Logger;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -18,6 +20,7 @@ import java.util.Set;
 
 
 public final class ExtractionMetrics extends Extraction {
+    private static Logger logger = Logger.getLogger(ExtractionMeta.class);
     private Set<String> curFiles;
     private Set<String> preFiles;
     private Set<String> attributes;
@@ -56,35 +59,20 @@ public final class ExtractionMetrics extends Extraction {
             bWriter.close();
             return;
         }
-        int total = 0;
-        int numBug = 0;
-        System.out.println("the size of commit_fileIds is " + commit_fileIds.size());
-        for (List<Integer> commit_fileId : commit_fileIds) {
-            sql = "select "+".commit_id,extraction1.file_id,rev,current_file_path,bug_introducing from extraction1,"
-                    + "scmlog,actions where extraction1.commit_id="
-                    + commit_fileId.get(0)
-                    + " and extraction1.file_id="
-                    + commit_fileId.get(1)
-                    + " and extraction1.commit_id=scmlog.id and extraction1.commit_id=actions.commit_id "
-                    + "and extraction1.file_id=actions.file_id";
+        System.out.println("the size of commit_fileIds is " + commit_file_parts.size());
+        for (List<Integer> commit_fileId : commit_file_parts) {
+            sql = "select rev,current_file_path from scmlog,actions where commit_id=" + commit_fileId.get(0)
+                    + " and file_id=" + commit_fileId.get(1) + " and commit_id=scmlog.id";
             resultSet = stmt.executeQuery(sql);
             while (resultSet.next()) {
-                bWriter.append(resultSet.getInt(1) + "   " + resultSet.getInt(2)
-                        + "   " + resultSet.getString(3) + "   "
-                        + resultSet.getString(4));
+                bWriter.append(commit_fileId.get(0) + "   " + commit_fileId.get(1) + "   "
+                        + resultSet.getString(1) + "   "
+                        + resultSet.getString(2));
                 bWriter.append("\n");
-                if (resultSet.getInt(5) == 1) {
-                    numBug++;
-                }
-                total++;
             }
         }
-
         bWriter.flush();
         bWriter.close();
-        System.out.println("the num of files is " + total);
-        System.out.println("the num of bug is " + numBug);
-        System.out.println("the ratio of bug is " + (double) numBug / total);
     }
 
     /**
@@ -209,7 +197,7 @@ public final class ExtractionMetrics extends Extraction {
      */
     public void extraFromTxt(String MetricFile) throws SQLException,
             IOException {
-        System.out.println("构建初始的复杂度标示");
+        logger.info("构建初始的复杂度标示");
         curFiles = new LinkedHashSet<>();
         preFiles = new HashSet<>();
         attributes = new LinkedHashSet<>();
@@ -260,9 +248,6 @@ public final class ExtractionMetrics extends Extraction {
     public void buildContentMap() {
         contentMap = new LinkedHashMap<>();
         commitId_fileIds = new ArrayList<>();
-        List<Integer> title = new ArrayList<>();
-        title.add(-1);
-        title.add(-1);
         commitId_fileIds.add(title);
         StringBuffer titleBuffer = new StringBuffer();
         for (String attri : attributes) {
@@ -288,45 +273,6 @@ public final class ExtractionMetrics extends Extraction {
             }
             contentMap.put(cf, temp);
         }
-    }
-
-    /**
-     * 将复杂度信息写入数据库,将消耗大量时间.
-     *
-     * @throws SQLException
-     */
-    @SuppressWarnings("unused")
-    private void createDatabase() throws SQLException {
-        System.out.println("将复杂度数据写如数据库");
-        sql = "create table extraction2(id int(11) primary key not null auto_increment,commit_id int(11),file_id int(11))";
-        stmt.executeUpdate(sql);
-        for (String files : curFiles) {
-            int commit_id = Integer.parseInt(files.split("_")[0]);
-            int file_id = Integer.parseInt(files.substring(0,
-                    files.indexOf('.')).split("_")[1]);
-            sql = "insert extraction2 (commit_id,file_id) values(" + commit_id
-                    + "," + file_id + ")";
-            stmt.executeUpdate(sql);
-        }
-        for (String attr : attributes) {
-            sql = "alter table extraction2 add column " + attr
-                    + " float default 0";
-            stmt.executeUpdate(sql);
-            for (String file : curFiles) {
-                int commit_id = Integer.parseInt(file.split("_")[0]);
-                int file_id = Integer.parseInt(file.substring(0,
-                        file.indexOf('.')).split("_")[1]);
-                Double value = grid.get(attr).get(file);
-                if (value == null) {
-                    value = 0.0;
-                }
-                sql = "update extraction2 set " + attr + "=" + value
-                        + " where commit_id=" + commit_id + " and file_id="
-                        + file_id;
-                stmt.executeUpdate(sql);
-            }
-        }
-
     }
 
     /**
