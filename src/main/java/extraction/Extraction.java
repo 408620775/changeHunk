@@ -93,12 +93,11 @@ public abstract class Extraction {
         while (resultSet.next()) {
             all_commits.add(resultSet.getInt(1));
         }
-        logger.info("The total number of commit is:" + all_commits.size());
         if (start < 0) {
             logger.error("start commit_id can't be less 0!");
             throw new IllegalArgumentException("start commit_id can't be less 0!");
         }
-        if (end > commits.size()) {
+        if (end > all_commits.size()) {
             logger.error("end is larger than the total number of commits!");
             throw new IllegalArgumentException(
                     "end is larger than the total number of commits!");
@@ -142,18 +141,22 @@ public abstract class Extraction {
                 int file_id = tmpCommit_fileId.get(1);
                 while (resultSet.next()) {
                     int patch_id = resultSet.getInt(1);
-                    String patch = resultSet.getString(2);
+                    String patch = resultSet.getString(2).trim();
                     int offset = 0;
                     if (patch.length() == 0) {
                         logger.error("Patch is empty! commit_file_patch:" + commit_id + "_" + file_id + "_" + patch_id);
                     }
-                    int sIndex = 0;
-                    int eIndex = patch.substring(sIndex + 1).indexOf("@@ -");
-                    while (eIndex != -1) {
-                        String hunkString = patch.substring(sIndex, eIndex);
+                    int sIndex = patch.indexOf("@@ -");
+                    int eIndex = patch.substring(sIndex + 1).indexOf("@@ -") + sIndex + 1;
+                    while (eIndex != sIndex) {
+                        String hunkString = patch.substring(sIndex, eIndex).trim();
+                        if (!hunkString.startsWith("@@ -")) {
+                            logger.error("Split patches error! commit_id=" + commit_id + " and file_id=" + file_id);
+                            logger.error("hunkString is :" + hunkString);
+                        }
                         int[] ranges = parseHunkRange(hunkString);
                         sIndex = eIndex;
-                        eIndex = patch.substring(sIndex + 1).indexOf("@@ -");
+                        eIndex = patch.substring(sIndex + 1).indexOf("@@ -") + sIndex + 1;
                         List<Integer> list = new ArrayList<>();
                         list.add(commit_id);
                         list.add(file_id);
@@ -181,9 +184,12 @@ public abstract class Extraction {
                 }
             }
         }
-        logger.info("The number of commits to be considered is:" + commits.size());
+        logger.info("The total number of various types commit is:" + all_commits.size());
+        logger.info("The total number of Java commit is:" + commits.size());
         logger.info("The total number of instances is:" + hunks_indexs.size());
-        logger.info("The number of instances that need to be considered is:" + commit_file_patch_offset_part.size());
+        logger.info("The selected commit order range is: [" + start + "," + end + "]");
+        logger.info("The number of effective Java commits to be considered is:" + commit_parts.size());
+        logger.info("The number of effective instances to be considered is:" + commit_file_patch_offset_part.size());
         logger.debug("commit_file_patch_offset_part of hunks and corresponding length are :");
         for (List<Integer> integerList : hunks_cache_part.keySet()) {
             StringBuilder sBuilder = new StringBuilder();
