@@ -83,15 +83,17 @@ public abstract class Extraction {
         commits = new ArrayList<>();
         commit_parts = new ArrayList<>();
         commit_file_parts = new ArrayList<>();
+        commit_files = new ArrayList<>();
         commit_file_patch_offset_part = new ArrayList<>();
         hunks_indexs = new LinkedHashMap<>();
-        List<Integer> all_commits = new ArrayList<>();
         hunks_cache_part = new LinkedHashMap<>();
+        List<Integer> all_commits = new ArrayList<>();
         sql = "select id from scmlog order by commit_date";
         resultSet = stmt.executeQuery(sql);
         while (resultSet.next()) {
             all_commits.add(resultSet.getInt(1));
         }
+        logger.info("The total number of commit is:" + all_commits.size());
         if (start < 0) {
             logger.error("start commit_id can't be less 0!");
             throw new IllegalArgumentException("start commit_id can't be less 0!");
@@ -117,7 +119,7 @@ public abstract class Extraction {
                 }
                 if (vaildFile_id) {
                     List<Integer> tmp = new ArrayList<>();
-                    tmp.add(commits.get(i));
+                    tmp.add(all_commits.get(i));
                     tmp.add(resultSet.getInt(1));
                     commit_files.add(tmp);
                     tmpCommit_fileIds.add(tmp);
@@ -179,7 +181,10 @@ public abstract class Extraction {
                 }
             }
         }
-        logger.debug("commit_file_patch_offset_part and length of hunks are :");
+        logger.info("The number of commits to be considered is:" + commits.size());
+        logger.info("The total number of instances is:" + hunks_indexs.size());
+        logger.info("The number of instances that need to be considered is:" + commit_file_patch_offset_part.size());
+        logger.debug("commit_file_patch_offset_part of hunks and corresponding length are :");
         for (List<Integer> integerList : hunks_cache_part.keySet()) {
             StringBuilder sBuilder = new StringBuilder();
             for (Integer integer : integerList) {
@@ -189,7 +194,7 @@ public abstract class Extraction {
         }
     }
 
-    public int[] parseHunkRange(String hunkString) {
+    public static int[] parseHunkRange(String hunkString) {
         String range = hunkString.substring(hunkString.indexOf("-") + 1, hunkString.lastIndexOf("@@"))
                 .replace(",", " ").replace("+", "");
         String[] numString = range.split(" ");
