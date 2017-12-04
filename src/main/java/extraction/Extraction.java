@@ -30,6 +30,7 @@ public abstract class Extraction {
     public static String databaseName;
     public static String metaTableName = "metaHunk";
     public static String metaTableNamekey = "MetaTableName";
+    public static String hunkStringStartFlag = "@@ -";
     public static boolean hasLoadProperty = false;
     public static Statement stmt;
     public static ResultSet resultSet;
@@ -40,8 +41,8 @@ public abstract class Extraction {
     public static List<List<Integer>> commit_file_parts;
     public static List<List<Integer>> commit_files;
     public static List<List<Integer>> commit_file_patch_offset_part;
+    public static List<List<Integer>> commit_file_patch_offsets;
     public static Map<List<Integer>, String> hunks_cache_part;
-    public static Map<List<Integer>, int[]> hunks_indexs;
     public static String databasePropertyPath = "src/main/resources/database.properties";
 
     public Extraction(String database, int start, int end) throws IOException, SQLException {
@@ -85,7 +86,7 @@ public abstract class Extraction {
         commit_file_parts = new ArrayList<>();
         commit_files = new ArrayList<>();
         commit_file_patch_offset_part = new ArrayList<>();
-        hunks_indexs = new LinkedHashMap<>();
+        commit_file_patch_offsets = new ArrayList<>();
         hunks_cache_part = new LinkedHashMap<>();
         List<Integer> all_commits = new ArrayList<>();
         sql = "select id from scmlog order by commit_date";
@@ -142,51 +143,26 @@ public abstract class Extraction {
                 while (resultSet.next()) {
                     int patch_id = resultSet.getInt(1);
                     String patch = resultSet.getString(2).trim();
-                    int offset = 0;
-                    if (patch.length() == 0) {
-                        logger.error("Patch is empty! commit_file_patch:" + commit_id + "_" + file_id + "_" + patch_id);
-                    }
-                    int sIndex = patch.indexOf("@@ -");
-                    int eIndex = patch.substring(sIndex + 1).indexOf("@@ -") + sIndex + 1;
-                    while (eIndex != sIndex) {
-                        String hunkString = patch.substring(sIndex, eIndex).trim();
-                        if (!hunkString.startsWith("@@ -")) {
-                            logger.error("Split patches error! commit_id=" + commit_id + " and file_id=" + file_id);
-                            logger.error("hunkString is :" + hunkString);
-                        }
-                        int[] ranges = parseHunkRange(hunkString);
-                        sIndex = eIndex;
-                        eIndex = patch.substring(sIndex + 1).indexOf("@@ -") + sIndex + 1;
-                        List<Integer> list = new ArrayList<>();
-                        list.add(commit_id);
-                        list.add(file_id);
-                        list.add(patch_id);
-                        list.add(offset);
-                        hunks_indexs.put(list, ranges);
-                        offset++;
+                    List<String> hunkStrings = parsePatchString(patch, commit_id, file_id, patch_id);
+                    for (int j = 0; j < hunkStrings.size(); j++) {
+                        List<Integer> keys = new ArrayList<>();
+                        keys.add(commit_id);
+                        keys.add(file_id);
+                        keys.add(patch_id);
+                        keys.add(j);
+                        commit_file_patch_offsets.add(keys);
                         if (i + 1 >= start && i + 1 <= end) {
-                            commit_file_patch_offset_part.add(list);
-                            hunks_cache_part.put(list, hunkString);
+                            commit_file_patch_offset_part.add(keys);
+                            hunks_cache_part.put(keys, hunkStrings.get(j));
                         }
                     }
-                    String hunkString = patch.substring(sIndex);
-                    int[] ranges = parseHunkRange(hunkString);
-                    List<Integer> lastHunk = new ArrayList<>();
-                    lastHunk.add(commit_id);
-                    lastHunk.add(file_id);
-                    lastHunk.add(patch_id);
-                    lastHunk.add(offset);
-                    hunks_indexs.put(lastHunk, ranges);
-                    if (i + 1 >= start && i + 1 <= end) {
-                        commit_file_patch_offset_part.add(lastHunk);
-                        hunks_cache_part.put(lastHunk, patch.substring(sIndex));
-                    }
+
                 }
             }
         }
         logger.info("The total number of various types commit is:" + all_commits.size());
         logger.info("The total number of Java commit is:" + commits.size());
-        logger.info("The total number of instances is:" + hunks_indexs.size());
+        logger.info("The total number of instances is:" + commit_file_patch_offsets.size());
         logger.info("The selected commit order range is: [" + start + "," + end + "]");
         logger.info("The number of effective Java commits to be considered is:" + commit_parts.size());
         logger.info("The number of effective instances to be considered is:" + commit_file_patch_offset_part.size());
@@ -198,6 +174,29 @@ public abstract class Extraction {
             }
             logger.debug(sBuilder + ":" + hunks_cache_part.get(integerList).length());
         }
+    }
+
+    public static List<String> parsePatchString(String patch, int commit_id, int file_id, int patch_id) {
+        if (patch.length() == 0) {
+            logger.error("Patch is empty! commit_file_patch:" + commit_id + "_" + file_id + "_" + patch_id);
+        }
+        List<String> hunkStrings = new ArrayList<>();
+        int sIndex = patch.indexOf(hunkStringStartFlag);
+        int eIndex = patch.substring(sIndex + 1).indexOf(hunkStringStartFlag) + sIndex + 1;
+        while (eIndex != sIndex) {
+            String hunkString = patch.substring(sIndex, eIndex).trim();
+            if (!hunkString.startsWith(hunkStringStartFlag)) {
+                logger.error("Split patches error! commit_id=" + commit_id + " and file_id=" + file_id);
+                logger.error("hunkString is :" + hunkString);
+            }
+            hunkStrings.add(hunkString);
+            sIndex = eIndex;
+            eIndex = patch.substring(sIndex + 1).indexOf(hunkStringStartFlag) + sIndex + 1;
+            List<Integer> list = new ArrayList<>();
+        }
+        String hunkString = patch.substring(sIndex).trim();
+        hunkStrings.add(hunkString);
+        return hunkStrings;
     }
 
     public static int[] parseHunkRange(String hunkString) {

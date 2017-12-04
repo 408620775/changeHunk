@@ -20,6 +20,9 @@ public final class ExtractionMeta extends Extraction {
     private List<String> curAttributes;
     private List<List<Integer>> commit_file_inExtracion1;
     private String message;
+    public static String line_break_symbol = "\n";
+    public static String add_operator_symbol = "+";
+    public static String sub_operator_symbol = "-";
 
     /**
      * 提取第一部分change info，s为指定开始的commit_id，e为结束的commit_id
@@ -94,19 +97,29 @@ public final class ExtractionMeta extends Extraction {
         while (resultSet.next()) {
             if (resultSet.getString(1).equals(metaTableName)) {
                 logger.info("Already has the table: " + metaTableName);
-                logger.info("Table will be uninstalled");
                 alreadyExist = true;
                 break;
             }
         }
         if (alreadyExist) {
-            sql = "DROP TABLE " + metaTableName;
-            int result = stmt.executeUpdate(sql);
-            if (result != -1) {
-                logger.info("Drop table successfully.");
-            } else {
-                logger.error("Drop table " + metaTableName + " fail.");
-                throw new SQLException("Drop table " + metaTableName + " fail.");
+            System.out.println("Please input whether or not to uninstall the old table(Y/N):");
+            Scanner scanner = new Scanner(System.in);
+            while (scanner.hasNext()) {
+                String input = scanner.next();
+                if (input.equals("Y")) {
+                    logger.info("Table will be uninstalled");
+                    sql = "DROP TABLE " + metaTableName;
+                    int result = stmt.executeUpdate(sql);
+                    if (result != -1) {
+                        logger.info("Drop table successfully.");
+                        break;
+                    } else {
+                        logger.error("Drop table " + metaTableName + " fail.");
+                        throw new SQLException("Drop table " + metaTableName + " fail.");
+                    }
+                } else {
+                    throw new SQLException("Already has the table:" + metaTableName);
+                }
             }
         }
         sql = "create table " + metaTableName + "(id int(11) primary key not null auto_increment,commit_id int(11),"
@@ -132,9 +145,9 @@ public final class ExtractionMeta extends Extraction {
 
     public void initial() throws SQLException {
         logger.info("initial the table");
-        for (List<Integer> key : hunks_indexs.keySet()) {
+        for (List<Integer> key : commit_file_patch_offsets) {
             sql = "insert " + metaTableName + " (commit_id,file_id,patch_id,offset) values("
-                    + key.get(0) + "," + key.get(1) + "," + key.get(2) + key.get(3) + ")";
+                    + key.get(0) + "," + key.get(1) + "," + key.get(2) + "," + key.get(3) + ")";
             stmt.executeUpdate(sql);
         }
     }
@@ -488,6 +501,7 @@ public final class ExtractionMeta extends Extraction {
                 is_bug_fix = commitId_isBugFix.get(commit_id);
             } else {
                 sql = "select is_bug_fix from scmlog where id=" + commit_id;
+                resultSet = stmt.executeQuery(sql);
                 while (resultSet.next()) {
                     if (resultSet.getInt(1) == 1) {
                         is_bug_fix = true;
@@ -498,63 +512,104 @@ public final class ExtractionMeta extends Extraction {
             if (!is_bug_fix) {
                 continue;
             }
-            sql = "select id,old_start_line,old_end_line,new_start_line,new_end_line from hunks where commit_id="
-                    + commit_id + " and file_id=" + file_id;
-            List<List<Integer>> fake_hunk_id_ranges = new ArrayList<>();
+            sql = "select id,old_end_line from hunks where commit_id=" + commit_id + " and file_id=" + file_id;
+            List<Integer> fake_fix_hunk_ids = new ArrayList<>();
             resultSet = stmt.executeQuery(sql);
             while (resultSet.next()) {
-                if (resultSet.getInt(3) == 0) { //old_end_line is 0, without a corresponding line.
+                if (resultSet.getInt(2) == 0) { //old_end_line is 0, without a corresponding line.
                     continue;
                 }
-                List<Integer> id_lineIndex = new ArrayList<>();
-                id_lineIndex.add(resultSet.getInt(1));
-                id_lineIndex.add(resultSet.getInt(2));
-                id_lineIndex.add(resultSet.getInt(3));
-                id_lineIndex.add(resultSet.getInt(4));
-                id_lineIndex.add(resultSet.getInt(5));
-                fake_hunk_id_ranges.add(id_lineIndex);
+                fake_fix_hunk_ids.add(resultSet.getInt(1));
             }
-            for (List<Integer> fake_hunk_id_range : fake_hunk_id_ranges) {
-                sql = "select bug_commit_id from hunk_blames where hunk_id=" + fake_hunk_id_range.get(0);
-                int bug_commit_id = -1;
+            if (fake_fix_hunk_ids.size() == 0) {
+                continue;
+            }
+            List<Integer> bug_commit_ids = new ArrayList<>();
+            for (Integer fake_fix_hunk_id : fake_fix_hunk_ids) {
+                sql = "select bug_commit_id from hunk_blames where hunk_id=" + fake_fix_hunk_id;
                 resultSet = stmt.executeQuery(sql);
                 while (resultSet.next()) {
-                    bug_commit_id = resultSet.getInt(1);
+                    bug_commit_ids.add(resultSet.getInt(1));
                 }
-                if (bug_commit_id == -1) {
-                    logger.debug("bug_commit_id for fake_hunk " + fake_hunk_id_range + " is empty but the commit which contains" +
-                            " fake_hunk " + fake_hunk_id_range + " is bug_fix!");
+                if (bug_commit_ids.size() == 0) {
+                    logger.error("bug_commit_id for fake_hunk " + fake_fix_hunk_id + " is empty but the commit which "
+                            + "contains fake_hunk " + fake_fix_hunk_id + " is bug_fix!");
                     continue;
                 }
-                sql = "select patch_id,offset from " + metaTableName + " where commit_id=" + bug_commit_id + " and file_id=" + file_id;
+            }
+            List<List<Integer>> bugKeys = new ArrayList<>();
+            List<Set<String>> bugStringSets = new ArrayList<>();
+            Set<String> fixStringSet = null;
+            for (Integer bug_commit_id : bug_commit_ids) {
+                sql = "select id,patch from patches where commit_id=" + bug_commit_id + " and file_id=" + file_id;
                 resultSet = stmt.executeQuery(sql);
-                List<Integer> matchKey = null;
-                while (resultSet.next()) {
-                    List<Integer> key = new ArrayList<>();
-                    key.add(bug_commit_id);
-                    key.add(file_id);
-                    key.add(resultSet.getInt(1));
-                    key.add(resultSet.getInt(2));
-                    if (!hunks_indexs.containsKey(key)) {
-                        logger.error("hunks_index don't contain the key:" + underLineFormat(key));
-                        continue;
-                    }
-                    int[] start_offset = hunks_indexs.get(key);
-                    if (fake_hunk_id_range.get(1) >= start_offset[2] && fake_hunk_id_range.get(2)
-                            <= start_offset[2] + start_offset[3]) {
-                        matchKey = key;
+                int patch_id = resultSet.getInt(1);
+                String patch = resultSet.getString(2);
+                if (patch == null || patch.equals("")) {
+                    logger.error("Path is empty where commit_id=" + bug_commit_id + " and file_id=" + file_id);
+                    continue;
+                }
+                List<String> hunkStrings = parsePatchString(patch, bug_commit_id, file_id, patch_id);
+                for (int i = 0; i < hunkStrings.size(); i++) {
+                    List<Integer> bugKey = new ArrayList<>();
+                    bugKey.add(bug_commit_id);
+                    bugKey.add(file_id);
+                    bugKey.add(patch_id);
+                    bugKey.add(i);
+                    bugKeys.add(bugKey);
+                    Set<String> bugStringSet = parseLineAccordingOperator(add_operator_symbol, hunkStrings.get(i));
+                    bugStringSets.add(bugStringSet);
+                }
+            }
+            int[] bugFlags = new int[bugKeys.size()];
+            sql = "select id,patch from patches where commit_id=" + commit_id + " and file_id=" + file_id;
+            resultSet = stmt.executeQuery(sql);
+            int fixPatchId = resultSet.getInt(1);
+            String fixPatchString = "";
+            while (resultSet.next()) {
+                fixPatchId = resultSet.getInt(1);
+                fixPatchString = resultSet.getString(2);
+            }
+            List<String> fixHunkStrings = parsePatchString(fixPatchString, commit_id, file_id, fixPatchId);
+            fixStringSet = parseLineAccordingOperator(sub_operator_symbol, fixPatchString);
+            for (String line : fixStringSet) {
+                boolean hasOldLine = false;
+                for (int i = 0; i < bugStringSets.size(); i++) {
+                    Set<String> bugStringSet = bugStringSets.get(i);
+                    if (bugStringSet.contains(line)) {
+                        hasOldLine = true;
+                        bugFlags[i] = 1;
                         break;
                     }
                 }
-                if (matchKey == null) {
-                    logger.error("fake_hunk_id:" + fake_hunk_id_range.get(0) + " don't hava a matched old hunk!");
+                if (!hasOldLine) {
+                    logger.error("Fix line does not have a corresponding bug line, the fix_commit_id=" + commit_id + " " +
+                            "and file_id=" + file_id + line_break_symbol + "The fix line is:" + line);
                 }
-                //need up speed.
-                sql = "update " + metaTableName + " set bug_introducing=1 where commit_id=" + matchKey.get(0) + " and "
-                        + "file_id=" + matchKey.get(1) + " and patch_id=" + matchKey.get(2) + " and offset=" + matchKey.get(3);
-                stmt.executeUpdate(sql);
+            }
+            for (int i = 0; i < bugFlags.length; i++) {
+                if (bugFlags[i] == 1) {
+                    List<Integer> key = bugKeys.get(i);
+                    sql = "update " + metaTableName + " set bug_introducing=1 where commit_id=" + key.get(0) + " "
+                            + "and file_id=" + key.get(1) + " and patch_id=" + key.get(2) + " and offset=" + key.get(3);
+                    stmt.executeUpdate(sql);
+                }
             }
         }
+    }
+
+    public Set<String> parseLineAccordingOperator(String operator, String parseLines) {
+        Set<String> res = new HashSet<>();
+        if (parseLines == null || parseLines.equals("")) {
+            return res;
+        }
+        String[] lines = parseLines.split(line_break_symbol);
+        for (String line : lines) {
+            if (line.startsWith(operator)) {
+                res.add(line.substring(operator.length()));
+            }
+        }
+        return res;
     }
 
     /**

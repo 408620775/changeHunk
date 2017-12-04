@@ -2,6 +2,7 @@ package extraction;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        ExtractionBow testBow = new ExtractionBow("MyVoldemort", "/home/niubinbin/test/voldemort", 501, 800);
+        ExtractionMeta extractionMeta = new ExtractionMeta("MyVoldemort",501,800);
+        extractionMeta.getMetaTableData();
     }
 }

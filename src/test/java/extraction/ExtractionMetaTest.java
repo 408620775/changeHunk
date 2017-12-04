@@ -12,6 +12,11 @@ import java.io.FileWriter;
 import static org.junit.Assert.*;
 
 public class ExtractionMetaTest {
+    @Test
+    public void parseLineAccordingOperator() throws Exception {
+
+    }
+
     @Before
     public void setUp() throws Exception {
     }
