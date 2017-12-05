@@ -77,7 +77,7 @@ public final class ExtractionMeta extends Extraction {
         eTime = System.currentTimeMillis();
         System.out.println("change_log_length() cost time:" + (eTime - sTime));
         sTime = eTime;
-        changed_LOC(false);
+        changed_LOC();
         eTime = System.currentTimeMillis();
         System.out.println("changed_LOC() cost time:" + (eTime - sTime));
     }
@@ -445,41 +445,26 @@ public final class ExtractionMeta extends Extraction {
      *
      * @throws SQLException
      */
-    public void changed_LOC(boolean excuteAll) throws SQLException {
+    //Fix me
+    public void changed_LOC() throws SQLException {
         System.out.println("get changed loc");
-        List<Integer> excuteList;
-        if (excuteAll) {
-            excuteList = commits;
-        } else {
-            excuteList = commit_parts;
-        }
-        List<Integer> hunk_ids = new ArrayList<>();
-        for (Integer integer : excuteList) {
-            sql = "select hunk_id from " + metaTableName + " where commit_id="
-                    + integer;
-            resultSet = stmt.executeQuery(sql);
-            while (resultSet.next()) {
-                int hunk_id = resultSet.getInt(1);
-                hunk_ids.add(hunk_id);
+        for (List<Integer> keys : commit_file_patch_offset_part) {
+            String real_hunk_string = hunks_cache_part.get(keys);
+            if (real_hunk_string == null || real_hunk_string.equals("")) {
+                logger.error("HunkString is empty! commit_id=" + keys.get(0) + ",file_id=" + keys.get(1) + ",patch_id="
+                        + keys.get(2) + ",offset=" + keys.get(3));
+                continue;
             }
-        }
-        for (Integer hunk_id : hunk_ids) {
-            sql = "select old_start_line,old_end_line,new_start_line,new_end_line from hunks where id="
-                    + hunk_id;
-            resultSet = stmt.executeQuery(sql);
-            int changeLoc = 0;
-            while (resultSet.next()) {
-                if (resultSet.getInt(1) != 0) {
-                    changeLoc = changeLoc + resultSet.getInt(2)
-                            - resultSet.getInt(1) + 1;
-                }
-                if (resultSet.getInt(3) != 0) {
-                    changeLoc = changeLoc + resultSet.getInt(4)
-                            - resultSet.getInt(3) + 1;
+            String[] lines = real_hunk_string.split("\n");
+            int changedLoc = 0;
+            //fommat problem
+            for (String line : lines) {
+                if (line.startsWith(add_operator_symbol) || line.startsWith(sub_operator_symbol)) {
+                    changedLoc++;
                 }
             }
-            sql = "update " + metaTableName + " set changed_LOC=" + changeLoc
-                    + " where hunk_id=" + hunk_id;
+            sql = "update " + metaTableName + " set changed_LOC=" + changedLoc + " where patch_id=" + keys.get(2)
+                    + " and offset=" + keys.get(3);
             stmt.executeUpdate(sql); // 这个信息，似乎在extraction2中的detal计算时已经包含了啊。
         }
     }
@@ -496,6 +481,7 @@ public final class ExtractionMeta extends Extraction {
         for (List<Integer> commit_file : commit_files) {
             int commit_id = commit_file.get(0);
             int file_id = commit_file.get(1);
+            String file_name = "";
             boolean is_bug_fix = false;
             if (commitId_isBugFix.containsKey(commit_id)) {
                 is_bug_fix = commitId_isBugFix.get(commit_id);
@@ -512,6 +498,22 @@ public final class ExtractionMeta extends Extraction {
             if (!is_bug_fix) {
                 continue;
             }
+
+            //If a commit_file's type is C, even if is_bug_fix is 1, there is no source to be traced.
+            //At least it's not found how to track the last file because of the change of file_id.
+            //Type C will change file_id, but Type V will not. But the change in the branch affects the
+            //file_id of the file.
+            boolean typeC = false;
+            sql = "select type from actions where commit_id=" + commit_id + " and file_id=" + file_id;
+            resultSet = stmt.executeQuery(sql);
+            while (resultSet.next()) {
+                if (resultSet.getString(1).equals("C")) {
+                    typeC = true;
+                }
+            }
+            if (typeC) {
+                continue;
+            }
             sql = "select id,old_end_line from hunks where commit_id=" + commit_id + " and file_id=" + file_id;
             List<Integer> fake_fix_hunk_ids = new ArrayList<>();
             resultSet = stmt.executeQuery(sql);
@@ -522,6 +524,7 @@ public final class ExtractionMeta extends Extraction {
                 fake_fix_hunk_ids.add(resultSet.getInt(1));
             }
             if (fake_fix_hunk_ids.size() == 0) {
+                logger.debug("Fake_fix_hunk's size is 0! fix_commit_id=" + commit_id + ", file_id=" + file_id);
                 continue;
             }
             List<Integer> bug_commit_ids = new ArrayList<>();
@@ -541,19 +544,38 @@ public final class ExtractionMeta extends Extraction {
             List<Set<String>> bugStringSets = new ArrayList<>();
             Set<String> fixStringSet = null;
             for (Integer bug_commit_id : bug_commit_ids) {
-                sql = "select id,patch from patches where commit_id=" + bug_commit_id + " and file_id=" + file_id;
+                int bug_file_id = -1;
+                sql = "select file_id from actions where commit_id=" + bug_commit_id + " and current_file_path="
+                        + "(select current_file_path from actions where commit_id=+" + commit_id + " and "
+                        + "file_id=" + file_id + ")";
                 resultSet = stmt.executeQuery(sql);
-                int patch_id = resultSet.getInt(1);
-                String patch = resultSet.getString(2);
-                if (patch == null || patch.equals("")) {
-                    logger.error("Path is empty where commit_id=" + bug_commit_id + " and file_id=" + file_id);
+                while (resultSet.next()) {
+                    bug_file_id = resultSet.getInt(1);
+                }
+                if (bug_file_id == -1) {
+                    logger.debug("Can't find the last file according to file_name: " + "bug_commit_id=" + bug_commit_id
+                            + ", fix_commit_id=" + commit_id + ", fix_file_id=" + file_id);
+                    logger.debug("Set bug_file_id to file_id:" + file_id);
+                    bug_file_id = file_id;
+                }
+                sql = "select id,patch from patches where commit_id=" + bug_commit_id + " and file_id = " + bug_file_id;
+                resultSet = stmt.executeQuery(sql);
+                int patch_id = -1;
+                String patch = "";
+                while (resultSet.next()) {
+                    patch_id = resultSet.getInt(1);
+                    patch = resultSet.getString(2);
+                }
+                if (patch_id == -1 || patch == null || patch.equals("")) {
+                    logger.error("Patch is empty when bug_commit_id=" + bug_commit_id + ",bug_file_id=" + bug_file_id +
+                            ". Meanwhile fix_commit_id=" + commit_id + ",fix_file_id=" + file_id);
                     continue;
                 }
-                List<String> hunkStrings = parsePatchString(patch, bug_commit_id, file_id, patch_id);
+                List<String> hunkStrings = parsePatchString(patch, bug_commit_id, bug_file_id, patch_id);
                 for (int i = 0; i < hunkStrings.size(); i++) {
                     List<Integer> bugKey = new ArrayList<>();
                     bugKey.add(bug_commit_id);
-                    bugKey.add(file_id);
+                    bugKey.add(bug_file_id);
                     bugKey.add(patch_id);
                     bugKey.add(i);
                     bugKeys.add(bugKey);
@@ -564,13 +586,17 @@ public final class ExtractionMeta extends Extraction {
             int[] bugFlags = new int[bugKeys.size()];
             sql = "select id,patch from patches where commit_id=" + commit_id + " and file_id=" + file_id;
             resultSet = stmt.executeQuery(sql);
-            int fixPatchId = resultSet.getInt(1);
+            int fixPatchId = -1;
             String fixPatchString = "";
             while (resultSet.next()) {
                 fixPatchId = resultSet.getInt(1);
                 fixPatchString = resultSet.getString(2);
             }
-            List<String> fixHunkStrings = parsePatchString(fixPatchString, commit_id, file_id, fixPatchId);
+            if (fixPatchId == -1 || fixPatchString == null || fixPatchString.equals("")) {
+                logger.error("Fix patch is empty when commit_id=" + commit_id + " and file_id=" + file_id);
+                continue;
+            }
+            fixPatchString = fixPatchString.substring(fixPatchString.indexOf("\n") + 1); //Exclude the first line of "---"
             fixStringSet = parseLineAccordingOperator(sub_operator_symbol, fixPatchString);
             for (String line : fixStringSet) {
                 boolean hasOldLine = false;
@@ -598,6 +624,7 @@ public final class ExtractionMeta extends Extraction {
         }
     }
 
+    //Hunk_blame can identify the optimization of parentheses in a statement.
     public Set<String> parseLineAccordingOperator(String operator, String parseLines) {
         Set<String> res = new HashSet<>();
         if (parseLines == null || parseLines.equals("")) {
@@ -606,7 +633,7 @@ public final class ExtractionMeta extends Extraction {
         String[] lines = parseLines.split(line_break_symbol);
         for (String line : lines) {
             if (line.startsWith(operator)) {
-                res.add(line.substring(operator.length()));
+                res.add(line.substring(operator.length()).trim().replace(" ", ""));
             }
         }
         return res;

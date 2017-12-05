@@ -10,6 +10,31 @@ import static org.junit.Assert.*;
 
 public class ExtractionTest {
     @Test
+    public void parsePatchString() throws Exception {
+        String patchString = "--- a/src/java/voldemort/VoldemortClientShell.java\n" +
+                "+++ b/src/java/voldemort/VoldemortClientShell.java\n" +
+                "@@ -75,7 +75,6 @@ public class VoldemortClientShell {\n" +
+                "                     client.put(tightenNumericTypes(jsonReader.read()),\n" +
+                "                                tightenNumericTypes(jsonReader.read()));\n" +
+                "                 } else if(line.toLowerCase().startsWith(\"get\")) {\n" +
+                "-                    logger.info (\"get called:\");\n" +
+                "                     JsonReader jsonReader = new JsonReader(new StringReader(line.substring(\"get\".length())));\n" +
+                "                     printVersioned(client.get(tightenNumericTypes(jsonReader.read())));\n" +
+                "                 } else if(line.toLowerCase().startsWith(\"delete\")) {";
+        String compare = "@@ -75,7 +75,6 @@ public class VoldemortClientShell {\n" +
+                "                     client.put(tightenNumericTypes(jsonReader.read()),\n" +
+                "                                tightenNumericTypes(jsonReader.read()));\n" +
+                "                 } else if(line.toLowerCase().startsWith(\"get\")) {\n" +
+                "-                    logger.info (\"get called:\");\n" +
+                "                     JsonReader jsonReader = new JsonReader(new StringReader(line.substring(\"get\".length())));\n" +
+                "                     printVersioned(client.get(tightenNumericTypes(jsonReader.read())));\n" +
+                "                 } else if(line.toLowerCase().startsWith(\"delete\")) {";
+        List<String> list = Extraction.parsePatchString(patchString,-1,-1,-1);
+        Assert.assertEquals(list.size(),1);
+        Assert.assertEquals(list.get(0),compare);
+    }
+
+    @Test
     public void parseHunkRangeTest() throws Exception {
         String hunkString = "@@ -340,14 +356,15 @@ public class StorageService extends AbstractService {\n" +
                 "                     }\n" +

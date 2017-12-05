@@ -166,14 +166,6 @@ public abstract class Extraction {
         logger.info("The selected commit order range is: [" + start + "," + end + "]");
         logger.info("The number of effective Java commits to be considered is:" + commit_parts.size());
         logger.info("The number of effective instances to be considered is:" + commit_file_patch_offset_part.size());
-        logger.debug("commit_file_patch_offset_part of hunks and corresponding length are :");
-        for (List<Integer> integerList : hunks_cache_part.keySet()) {
-            StringBuilder sBuilder = new StringBuilder();
-            for (Integer integer : integerList) {
-                sBuilder.append(integer + " ");
-            }
-            logger.debug(sBuilder + ":" + hunks_cache_part.get(integerList).length());
-        }
     }
 
     public static List<String> parsePatchString(String patch, int commit_id, int file_id, int patch_id) {
