@@ -527,7 +527,7 @@ public final class ExtractionMeta extends Extraction {
                 logger.debug("Fake_fix_hunk's size is 0! fix_commit_id=" + commit_id + ", file_id=" + file_id);
                 continue;
             }
-            List<Integer> bug_commit_ids = new ArrayList<>();
+            Set<Integer> bug_commit_ids = new LinkedHashSet<>();
             for (Integer fake_fix_hunk_id : fake_fix_hunk_ids) {
                 sql = "select bug_commit_id from hunk_blames where hunk_id=" + fake_fix_hunk_id;
                 resultSet = stmt.executeQuery(sql);
@@ -632,6 +632,9 @@ public final class ExtractionMeta extends Extraction {
         }
         String[] lines = parseLines.split(line_break_symbol);
         for (String line : lines) {
+            if (line.equals("")) {
+                continue;
+            }
             if (line.startsWith(operator)) {
                 res.add(line.substring(operator.length()).trim().replace(" ", ""));
             }
@@ -652,10 +655,10 @@ public final class ExtractionMeta extends Extraction {
      */
     public void just_in_time(String gitFile) throws SQLException,
             ParseException, IOException, InterruptedException {
-        diffusion();
-        size(false);
-        purpose(false);
-        history(gitFile);
+        //diffusion();
+        size();
+        //purpose();
+        //history(gitFile);
     }
 
     /**
@@ -734,7 +737,7 @@ public final class ExtractionMeta extends Extraction {
      *
      * @throws SQLException
      */
-    public void size(boolean excuteAll) throws SQLException {
+    public void size() throws SQLException {
         System.out.println("Update Size");
         if (curAttributes == null) {
             obtainCurAttributes();
@@ -746,59 +749,30 @@ public final class ExtractionMeta extends Extraction {
             curAttributes.add("ld");
             curAttributes.add("lt");
         }
+        List<List<Integer>> executeList = commit_file_patch_offset_part;
+        for (List<Integer> keys : executeList) {
+            String hunkString = hunks_cache_part.get(keys);
+            int ldHunkLevel = countLineNumAccordingOperator(sub_operator_symbol, hunkString);
+            int laHunkLevel = countLineNumAccordingOperator(add_operator_symbol, hunkString);
+            int ltHunkLevel = ldHunkLevel + laHunkLevel;
+            sql = "UPDATE " + metaTableName + " SET ld=" + ldHunkLevel + " ,la=" + laHunkLevel + ",lt=" + ltHunkLevel +
+                    " where patch_id=" + keys.get(2) + " and offset=" + keys.get(3);
+            stmt.executeUpdate(sql);
+        }
+    }
 
-        List<List<Integer>> executeList;
-        if (excuteAll == true) {
-            if (commit_file_inExtracion1 == null) {
-                obtainCFidInExtraction1();
-            }
-            executeList = commit_file_inExtracion1;
-        } else {
-            executeList = commit_file_parts;
+    private int countLineNumAccordingOperator(String operator_symbol, String hunkString) {
+        if (operator_symbol == null || operator_symbol.equals("") || hunkString == null || hunkString.equals("")) {
+            return 0;
         }
-        for (List<Integer> list : executeList) {
-            sql = "select old_start_line,old_end_line,new_start_line,new_end_line,id from hunks where commit_id="
-                    + list.get(0) + " and file_id=" + list.get(1);
-            Map<Integer, int[]> map = new HashMap<>();
-            int ldFileLevel = 0;
-            int laFileLevel = 0;
-            int ltFileLevel = 0;
-            resultSet = stmt.executeQuery(sql);
-            while (resultSet.next()) {
-                int ldHunkLevel = 0;
-                int laHunkLevel = 0;
-                if (resultSet.getInt(1) != 0) {
-                    ldHunkLevel = resultSet.getInt(2) - resultSet.getInt(1) + 1;
-                }
-                if (resultSet.getInt(3) != 0) {
-                    laHunkLevel = resultSet.getInt(4) - resultSet.getInt(3) + 1;
-                }
-                int[] array = new int[2];
-                array[0] = ldHunkLevel;
-                array[1] = laHunkLevel;
-                ldFileLevel += ldHunkLevel;
-                laFileLevel += laHunkLevel;
-                map.put(resultSet.getInt(5), array);
+        String[] lines = hunkString.split(line_break_symbol);
+        int res = 0;
+        for (String line : lines) {
+            if (line.startsWith(operator_symbol)) {
+                res++;
             }
-            for (Integer hunk_id : map.keySet()) {
-                sql = "UPDATE " + metaTableName + " SET ld=" + map.get(hunk_id)[0] + " ,la=" + map.get(hunk_id)[1] + " where " +
-                        "hunk_id=" + hunk_id;
-                stmt.executeUpdate(sql);
-            }
-            sql = "SELECT sloc FROM " + metaTableName + " where commit_id=" + list.get(0)
-                    + " and file_id=" + list.get(1);
-            resultSet = stmt.executeQuery(sql);
-            while (resultSet.next()) {
-                ltFileLevel = resultSet.getInt(1);
-            }
-            ltFileLevel = ltFileLevel - laFileLevel + ldFileLevel;
-            if (ltFileLevel < 0) {
-                System.out.println("lt<0!!!" + " commit_id=" + list.get(0) + "file_id=" + list.get(1));
-            }
-            sql = "UPDATE " + metaTableName + " SET lt=" + ltFileLevel
-                    + " where commit_id=" + list.get(0) + " and file_id=" + list.get(1);
-            stmt.executeUpdate(sql); // 这个信息，似乎在extraction2中的detal计算时已经包含了啊。
         }
+        return res;
     }
 
     /**
@@ -841,7 +815,7 @@ public final class ExtractionMeta extends Extraction {
      *
      * @throws SQLException
      */
-    public void purpose(boolean excuteAll) throws SQLException {
+    public void purpose() throws SQLException {
         System.out.println("Update purpose");
         if (curAttributes == null) {
             obtainCurAttributes();
@@ -851,16 +825,7 @@ public final class ExtractionMeta extends Extraction {
             stmt.executeUpdate(sql);
             curAttributes.add("fix");
         }
-        List<List<Integer>> executeList = null;
-        if (excuteAll == true) {
-            if (commit_file_inExtracion1 == null) {
-                obtainCFidInExtraction1();
-            }
-            executeList = commit_file_inExtracion1;
-        } else {
-            executeList = commit_file_parts;
-        }
-
+        List<List<Integer>> executeList = commit_file_parts;
         for (List<Integer> list : executeList) {
             sql = "UPDATE " + metaTableName + ",scmlog SET fix=is_bug_fix where " + metaTableName + ".commit_id=scmlog.id and"
                     + " " + metaTableName + ".commit_id=" + list.get(0);
@@ -880,7 +845,7 @@ public final class ExtractionMeta extends Extraction {
             InterruptedException {
         System.out.println("Update history With Python");
         String command = "python " + System.getProperty("user.dir")
-                + "/src/scripts/history.py -d "
+                + "/src/main/scripts/history.py -d "
                 + databaseName + " -s " + start + " -e " + end + " -g "
                 + gitFile;
         System.out.println(command);

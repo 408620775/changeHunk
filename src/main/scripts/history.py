@@ -29,7 +29,7 @@ class extraction1:
             # print commit_ids,len(commit_ids)
 
     def readDatabaseConfig(self):
-        databasePro = os.path.abspath(os.path.join(os.getcwd(), "../..")) + '/database.properties'
+        databasePro = os.path.abspath(os.path.join(os.getcwd(), "../")) + '/resources/database.properties'
         config = open(databasePro)
         line = config.readline()
         while line:
