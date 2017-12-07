@@ -9,14 +9,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 
 public final class ExtractionMetrics extends Extraction {
@@ -248,12 +241,12 @@ public final class ExtractionMetrics extends Extraction {
     public void buildContentMap() {
         contentMap = new LinkedHashMap<>();
         commitId_fileIds = new ArrayList<>();
-        commitId_fileIds.add(title);
+        commitId_fileIds.add(titleIndex);
         StringBuffer titleBuffer = new StringBuffer();
         for (String attri : attributes) {
             titleBuffer.append(attri + ",");
         }
-        contentMap.put(title, titleBuffer);
+        contentMap.put(titleIndex, titleBuffer);
 
         for (String file : curFiles) {
             int commit_id = Integer.parseInt(file.split("_")[0]);
@@ -309,11 +302,28 @@ public final class ExtractionMetrics extends Extraction {
 
     @Override
     public Map<List<Integer>, StringBuffer> getContentMap() throws SQLException {
-        return contentMap;
+        Map<List<Integer>, StringBuffer> res = new LinkedHashMap<>();
+        res.put(titleIndex,contentMap.get(titleIndex));
+        for (List<Integer> keys : commit_file_patch_offset_part) {
+            boolean find = false;
+            for (List<Integer> contentKeys : contentMap.keySet()) {
+                if (contentKeys.get(0).intValue()==keys.get(0) && contentKeys.get(1).intValue() == keys.get(1)) {
+                    res.put(keys, contentMap.get(contentKeys));
+                    find = true;
+                    break;
+                }
+            }
+            if (find == false) {
+                logger.error("Can't find metrics! commit_id=" + keys.get(0) + ", file_id=" + keys.get(1) + ", patch_id="
+                        + keys.get(2) + ", offset=" + keys.get(3));
+            }
+        }
+        return res;
     }
 
     public static void main(String[] args) throws Exception {
-        ExtractionMetrics extractionMetrics = new ExtractionMetrics("MyFlink", 1001, 1300);
-        extractionMetrics.recoverPreFile("flinkFiles");
+        ExtractionMetrics extractionMetrics = new ExtractionMetrics("MyVoldemort", 501, 800);
+        extractionMetrics.extraFromTxt("/home/niubinbin/MyVoldemortMetrics.txt");
+        FileOperation.writeContentMap(extractionMetrics.getContentMap(), "/home/niubinbin/MyVoldemortMetrics.csv");
     }
 }

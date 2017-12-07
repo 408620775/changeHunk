@@ -42,12 +42,11 @@ public class ExtractionBow extends Extraction {
      * 提取第三部分信息。
      *
      * @param database    需要连接的数据库
-     * @param projectHome
      * @param startId
      * @param endId
      * @throws Exception
      */
-    public ExtractionBow(String database, String projectHome, int startId,
+    public ExtractionBow(String database, int startId,
                          int endId) throws Exception {
         super(database, startId, endId);
 
@@ -55,7 +54,7 @@ public class ExtractionBow extends Extraction {
         currStrings = new HashSet<>();
         contentMap = new LinkedHashMap<>();
         colMap = new HashMap<>();
-        contentMap.put(title, new StringBuffer());
+        contentMap.put(titleIndex, new StringBuffer());
         for (List<Integer> list : commit_file_patch_offset_part) {
             contentMap.put(list, new StringBuffer());
         }
@@ -86,7 +85,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.put(title, tent.get(title).append(ColName + ","));
+                    tent.put(titleIndex, tent.get(titleIndex).append(ColName + ","));
                 } else if (list.get(0) == commitId) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -164,7 +163,7 @@ public class ExtractionBow extends Extraction {
                     stringBuilder.append(line);
                 }
             }
-            Map<String, Integer> patchMap = Bow.bowP(stringBuilder);
+            Map<String, Integer> patchMap = Bow.bow(stringBuilder.toString());  //fix me
             for (String s : patchMap.keySet()) {
                 contentMap = writeInfo(s, contentMap, list.get(0), list.get(1), list.get(2), list.get(3),
                         patchMap.get(s));
@@ -195,7 +194,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.get(title).append(ColName + ",");
+                    tent.get(titleIndex).append(ColName + ",");
                 } else if (list.get(0) == commitId && list.get(1) == fileId && list.get(2) == patch_id && list.get(3) == offset) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -258,7 +257,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.get(title).append(ColName + ",");
+                    tent.get(titleIndex).append(ColName + ",");
                 } else if (list.get(0) == commit_id && list.get(1) == file_id) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -300,5 +299,10 @@ public class ExtractionBow extends Extraction {
     @Override
     public Map<List<Integer>, StringBuffer> getContentMap() throws SQLException {
         return contentMap;
+    }
+
+    public static void main(String[] args) throws Exception {
+        ExtractionBow extractionBow= new ExtractionBow("MyVoldemort",501,800);
+        FileOperation.writeContentMap(extractionBow.getContentMap(),"MyVoldemortBow.csv");
     }
 }

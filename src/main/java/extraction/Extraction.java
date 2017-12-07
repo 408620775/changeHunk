@@ -37,7 +37,8 @@ public abstract class Extraction {
     public static SQLConnection sqlL;
     public static List<Integer> commits;
     public static List<Integer> commit_parts;
-    public static List<Integer> title = Arrays.asList(-1, -1, -1, -1);
+    public static List<Integer> titleIndex = Arrays.asList(-1, -1, -1, -1);
+    public static List<String> titleName = Arrays.asList("commit_id", "file_id", "patch_id", "offset");
     public static List<List<Integer>> commit_file_parts;
     public static List<List<Integer>> commit_files;
     public static List<List<Integer>> commit_file_patch_offset_part;
@@ -51,7 +52,9 @@ public abstract class Extraction {
         this.databaseName = database;
         this.sqlL = SQLConnection.getConnection(database, databasePropertyPath);
         this.stmt = sqlL.getStmt();
-        initialKeys();
+        if (commits==null){
+            initialKeys();
+        }
         if (!hasLoadProperty) {
             loadProperty(databasePropertyPath);
         }

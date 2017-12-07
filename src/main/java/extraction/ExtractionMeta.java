@@ -655,10 +655,10 @@ public final class ExtractionMeta extends Extraction {
      */
     public void just_in_time(String gitFile) throws SQLException,
             ParseException, IOException, InterruptedException {
-        //diffusion();
+        diffusion();
         size();
-        //purpose();
-        //history(gitFile);
+        purpose();
+        history(gitFile);
     }
 
     /**
@@ -1050,11 +1050,12 @@ public final class ExtractionMeta extends Extraction {
         resultSet = stmt.executeQuery(sql);
         int colcount = resultSet.getMetaData().getColumnCount();
         int labelIndex = 0;
-        for (int i = title.size() + 2; i <= colcount; i++) {
+        for (int i = titleIndex.size() + 2; i <= colcount; i++) {
             String colName = resultSet.getMetaData().getColumnName(i);
             titleBuffer.append(colName + ",");
         }
-        content.put(title, titleBuffer);
+        titleBuffer = titleBuffer.deleteCharAt(titleBuffer.length()-1);
+        content.put(titleIndex, titleBuffer);
 
         for (List<Integer> commit_file_patch_offest : commit_file_patch_offset_part) {
             StringBuffer temp = new StringBuffer();
@@ -1064,9 +1065,10 @@ public final class ExtractionMeta extends Extraction {
             resultSet = stmt.executeQuery(sql);
             int colCount = resultSet.getMetaData().getColumnCount();
             resultSet.next();
-            for (int i = title.size() + 2; i <= colCount; i++) {
+            for (int i = titleIndex.size() + 2; i <= colCount; i++) {
                 temp.append(resultSet.getString(i) + ",");
             }
+            temp=temp.deleteCharAt(temp.length()-1);
             content.put(commit_file_patch_offest, temp);
         }
         return content;
