@@ -7,8 +7,9 @@ import java.util.Map;
 public class Main {
     public static void main(String[] args) throws Exception {
         ExtractionMeta extractionMeta = new ExtractionMeta("MyFlink",1001,1300);
-        extractionMeta.getMetaTableData();
-        extractionMeta.just_in_time("/home/niubinbin/test/flink");
+        //extractionMeta.getMetaTableData();
+        //extractionMeta.just_in_time("/home/niubinbin/test/flink");
+        System.out.println(extractionMeta.countRatio());;
 //        ExtractionMetrics extractionMetrics = new ExtractionMetrics("MyVoldemort",501,800);
 //        extractionMetrics.extraFromTxt("/home/niubinbin/MyVoldemortMetrics.txt");
 //        ExtractionBow extractionBow = new ExtractionBow("MyVoldemort",501,800);

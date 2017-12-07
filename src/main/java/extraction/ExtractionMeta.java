@@ -636,7 +636,8 @@ public final class ExtractionMeta extends Extraction {
                 continue;
             }
             if (line.startsWith(operator)) {
-                res.add(line.substring(operator.length()).trim().replace(" ", ""));
+                line = line.substring(operator.length()).trim().replaceAll("\\s+|\t", "");
+                res.add(line);
             }
         }
         return res;
