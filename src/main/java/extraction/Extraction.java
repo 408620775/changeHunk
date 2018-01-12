@@ -52,7 +52,7 @@ public abstract class Extraction {
         this.databaseName = database;
         this.sqlL = SQLConnection.getConnection(database, databasePropertyPath);
         this.stmt = sqlL.getStmt();
-        if (commits==null){
+        if (commits == null) {
             initialKeys();
         }
         if (!hasLoadProperty) {
@@ -174,6 +174,7 @@ public abstract class Extraction {
     public static List<String> parsePatchString(String patch, int commit_id, int file_id, int patch_id) {
         if (patch.length() == 0) {
             logger.error("Patch is empty! commit_file_patch:" + commit_id + "_" + file_id + "_" + patch_id);
+            return new ArrayList<>();
         }
         List<String> hunkStrings = new ArrayList<>();
         int sIndex = patch.indexOf(hunkStringStartFlag);
