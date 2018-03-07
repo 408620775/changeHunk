@@ -85,7 +85,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.put(titleIndex, tent.get(titleIndex).append(ColName + ","));
+                    tent.put(titleIndex, tent.get(titleIndex).append(s + ","));
                 } else if (list.get(0) == commitId) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -163,7 +163,7 @@ public class ExtractionBow extends Extraction {
                     stringBuilder.append(line);
                 }
             }
-            Map<String, Integer> patchMap = Bow.bow(stringBuilder.toString());  //fix me
+            Map<String, Integer> patchMap = Bow.bowP(stringBuilder.toString());  //fix me
             for (String s : patchMap.keySet()) {
                 contentMap = writeInfo(s, contentMap, list.get(0), list.get(1), list.get(2), list.get(3),
                         patchMap.get(s));
@@ -257,7 +257,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.get(titleIndex).append(ColName + ",");
+                    tent.get(titleIndex).append(s + ",");
                 } else if (list.get(0) == commit_id && list.get(1) == file_id) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
