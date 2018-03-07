@@ -49,6 +49,10 @@ public class FileOperation {
      */
     public static void writeStringBuffer(StringBuffer sBuffer, String outFile)
             throws IOException {
+        File file = new File(outFile);
+        if (!file.exists()){
+            file.createNewFile();
+        }
         BufferedWriter bWriter = new BufferedWriter(new FileWriter(new File(
                 outFile)));
         bWriter.append(sBuffer);

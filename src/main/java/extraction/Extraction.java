@@ -47,12 +47,13 @@ public abstract class Extraction {
     public static String databasePropertyPath = "src/main/resources/database.properties";
 
     public Extraction(String database, int start, int end) throws IOException, SQLException {
+        logger.info("Extract " + database + " information. The start commit_id is " + start + " and the end commit_id is " + end);
         this.start = start;
         this.end = end;
         this.databaseName = database;
         this.sqlL = SQLConnection.getConnection(database, databasePropertyPath);
         this.stmt = sqlL.getStmt();
-        if (commits==null){
+        if (commits == null) {
             initialKeys();
         }
         if (!hasLoadProperty) {
@@ -174,8 +175,14 @@ public abstract class Extraction {
     public static List<String> parsePatchString(String patch, int commit_id, int file_id, int patch_id) {
         if (patch.length() == 0) {
             logger.error("Patch is empty! commit_file_patch:" + commit_id + "_" + file_id + "_" + patch_id);
+            return new ArrayList<>();
         }
         List<String> hunkStrings = new ArrayList<>();
+        if (!patch.contains(hunkStringStartFlag)) {
+            logger.error("Patch content don't contain \"@@ -\",commit_id=" + commit_id + ",file_id=" + file_id + ","
+                    + "patch_id=" + patch_id);
+            return new ArrayList<>();
+        }
         int sIndex = patch.indexOf(hunkStringStartFlag);
         int eIndex = patch.substring(sIndex + 1).indexOf(hunkStringStartFlag) + sIndex + 1;
         while (eIndex != sIndex) {

@@ -5,6 +5,10 @@ changeHunk.iml
 log
 target/*
 !/pom.xml
+logs
+metricFiles
+csv
+src/main/scripts/changeLine.py
 将删除 .idea/
 将删除 out/
 将删除 pom.xml
