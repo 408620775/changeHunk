@@ -637,6 +637,9 @@ public final class ExtractionMeta extends Extraction {
             }
             if (line.startsWith(operator)) {
                 line = line.substring(operator.length()).trim().replaceAll("\\s+|\t", "");
+                if (line.equals("")){
+                    continue;
+                }
                 res.add(line);
             }
         }
@@ -1101,6 +1104,21 @@ public final class ExtractionMeta extends Extraction {
             bug = resultSet.getInt(1);
         }
         return (double) bug / total;
+    }
+
+    public void HunkMetrics() throws SQLException {
+        logger.info("Get HunkMetrics");
+        if (curAttributes == null) {
+            obtainCurAttributes();
+        }
+        if (!curAttributes.contains("ns")) {
+            sql = "alter table " + metaTableName + " add (ns int(4),nd int(4),nf int(4),entropy float)";
+            stmt.executeUpdate(sql);
+            curAttributes.add("ns");
+            curAttributes.add("nd");
+            curAttributes.add("nf");
+            curAttributes.add("entropy");
+        }
     }
 }
 
