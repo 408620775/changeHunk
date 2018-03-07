@@ -30,12 +30,6 @@ public class MyTool {
             throws IllegalArgumentException {
         float sum = 0f;
         for (Integer integer : changeOfFile) {
-            // if (integer<0) {
-            // System.out.println("概率值不能为小于等于0!");
-            // throw new IllegalArgumentException();
-            // }else if (integer==0) {
-            // System.out.println("abnormal point");
-            // }
             sum += integer;
         }
         if (sum - 0 < 0.001) {

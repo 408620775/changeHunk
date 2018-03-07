@@ -39,47 +39,18 @@ public final class ExtractionMeta extends Extraction {
     /**
      * 生成mataTable表,并将相关数据填入表中.
      */
-    public void getMetaTableData() throws Exception {
-        long sTime = System.currentTimeMillis();
+    public void getMetaTableData(String gitFilePath) throws Exception {
         CreateTable();
-        long eTime = System.currentTimeMillis();
-        logger.info("CreateTable() cost time:" + (eTime - sTime));
-        sTime = eTime;
         initial();
-        eTime = System.currentTimeMillis();
-        logger.info("initial() cost time:" + (eTime - sTime));
-        sTime = eTime;
         bug_introducing();
-        eTime = System.currentTimeMillis();
-        System.out.println("bug_introducing() cost time:" + (eTime - sTime));
-        sTime = eTime;
         cumulative_bug_count();
-        eTime = System.currentTimeMillis();
-        System.out.println("cumulative_bug_count() cost time:" + (eTime - sTime));
-        sTime = eTime;
         cumulative_change_count();
-        eTime = System.currentTimeMillis();
-        System.out.println("cumulative_change_count() cost time:" + (eTime - sTime));
-        sTime = eTime;
         author_name(false);
-        eTime = System.currentTimeMillis();
-        System.out.println("author_name() cost time:" + (eTime - sTime));
-        sTime = eTime;
         commit_day(false);
-        eTime = System.currentTimeMillis();
-        System.out.println("commit_day() cost time:" + (eTime - sTime));
-        sTime = eTime;
         commit_hour(false);
-        eTime = System.currentTimeMillis();
-        System.out.println("commit_hour() cost time:" + (eTime - sTime));
-        sTime = eTime;
         change_log_length(false);
-        eTime = System.currentTimeMillis();
-        System.out.println("change_log_length() cost time:" + (eTime - sTime));
-        sTime = eTime;
         changed_LOC();
-        eTime = System.currentTimeMillis();
-        System.out.println("changed_LOC() cost time:" + (eTime - sTime));
+        just_in_time(gitFilePath);
     }
 
     /**
@@ -91,6 +62,7 @@ public final class ExtractionMeta extends Extraction {
      * @throws SQLException
      */
     public void CreateTable() throws SQLException {
+        long sTime = System.currentTimeMillis();
         sql = "show tables";
         resultSet = stmt.executeQuery(sql);
         boolean alreadyExist = false;
@@ -102,7 +74,7 @@ public final class ExtractionMeta extends Extraction {
             }
         }
         if (alreadyExist) {
-            System.out.println("Please input whether or not to uninstall the old table(Y/N):");
+            logger.info("Please input whether or not to uninstall the old table(Y/N):");
             Scanner scanner = new Scanner(System.in);
             while (scanner.hasNext()) {
                 String input = scanner.next();
@@ -133,6 +105,8 @@ public final class ExtractionMeta extends Extraction {
             logger.error("Failed to create mateTable.");
             throw new SQLException("Failed to create mateTable.");
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("CreateTable() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -145,11 +119,14 @@ public final class ExtractionMeta extends Extraction {
 
     public void initial() throws SQLException {
         logger.info("initial the table");
+        long sTime = System.currentTimeMillis();
         for (List<Integer> key : commit_file_patch_offsets) {
             sql = "insert " + metaTableName + " (commit_id,file_id,patch_id,offset) values("
                     + key.get(0) + "," + key.get(1) + "," + key.get(2) + "," + key.get(3) + ")";
             stmt.executeUpdate(sql);
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("initial() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -188,19 +165,23 @@ public final class ExtractionMeta extends Extraction {
      * @throws SQLException
      */
     public void author_name(boolean excuteAll) throws SQLException {
+        long sTime = System.currentTimeMillis();
+        logger.info("get author_name");
         List<Integer> excuteList;
         if (excuteAll) {
             excuteList = commits;
         } else {
             excuteList = commit_parts;
         }
-        System.out.println("get author_name");
+
         for (Integer integer : excuteList) {
             sql = "update " + metaTableName + ",scmlog,people set " + metaTableName + ".author_name=people.name where "
                     + metaTableName + ".commit_id=" + integer + " and " + metaTableName + ".commit_id=scmlog.id and "
                     + "scmlog.author_id=people.id";
             stmt.executeUpdate(sql);
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("author_name() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -210,7 +191,8 @@ public final class ExtractionMeta extends Extraction {
      * @throws SQLException
      */
     public void commit_day(boolean excuteAll) throws SQLException {
-        System.out.println("get commit_day");
+        long sTime = System.currentTimeMillis();
+        logger.info("get commit_day");
         List<Integer> excuteList;
         if (excuteAll) {
             excuteList = commits;
@@ -227,7 +209,6 @@ public final class ExtractionMeta extends Extraction {
             }
         }
 
-        // System.out.println(mapD.size()); //测试是否提取出时间，结果正确
         Calendar calendar = Calendar.getInstance();// 获得一个日历
         String[] str = {"Sunday", "Monday", "Tuesday", "Wednesday",
                 "Thursday", "Friday", "Saturday",};
@@ -243,6 +224,8 @@ public final class ExtractionMeta extends Extraction {
                     + "\" where commit_id=" + i;
             stmt.executeUpdate(sql);
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("commit_day() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -254,7 +237,8 @@ public final class ExtractionMeta extends Extraction {
      */
     public void commit_hour(boolean excuteAll) throws NumberFormatException,
             SQLException {
-        System.out.println("get commit_hour");
+        long sTime = System.currentTimeMillis();
+        logger.info("get commit_hour");
         List<Integer> excuteList;
         if (excuteAll) {
             excuteList = commits;
@@ -280,6 +264,8 @@ public final class ExtractionMeta extends Extraction {
                     + "  where commit_id=" + key;
             stmt.executeUpdate(sql);
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("commit_hour() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -289,7 +275,8 @@ public final class ExtractionMeta extends Extraction {
      * @throws SQLException
      */
     public void change_log_length(boolean excuteAll) throws SQLException {
-        System.out.println("get change log length");
+        long sTime = System.currentTimeMillis();
+        logger.info("get change log length");
         List<Integer> excuteList;
         if (excuteAll) {
             excuteList = commits;
@@ -307,6 +294,8 @@ public final class ExtractionMeta extends Extraction {
                     + message.length() + " where commit_id=" + integer;
             stmt.executeUpdate(sql);
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("change_log_length() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -361,7 +350,8 @@ public final class ExtractionMeta extends Extraction {
      */
     // FIXME 此函数也需要在resources包中的history.py中实现.但是目前还没有发现其实现办法.
     public void cumulative_bug_count() throws Exception {
-        System.out.println("get cumulative bug count");
+        long sTime = System.currentTimeMillis();
+        logger.info("get cumulative bug count");
         sql = "select count(*) from " + metaTableName;
         resultSet = stmt.executeQuery(sql);
         int totalNum = 0;
@@ -400,6 +390,8 @@ public final class ExtractionMeta extends Extraction {
                     + fileName_curBugCount.get(file_name) + " where id=" + i;
             stmt.executeUpdate(sql);
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("cumulative_bug_count() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -410,7 +402,8 @@ public final class ExtractionMeta extends Extraction {
      */
     @SuppressWarnings("unused")
     private void cumulative_change_count() throws SQLException {
-        System.out.println("get cumulative change count");
+        long sTime = System.currentTimeMillis();
+        logger.info("get cumulative change count");
         sql = "select count(*) from " + metaTableName;
         resultSet = stmt.executeQuery(sql);
         int totalNum = 0;
@@ -437,6 +430,8 @@ public final class ExtractionMeta extends Extraction {
                     + fileName_curChangeCount.get(file_name) + " where id=" + i;
             stmt.executeUpdate(sql);
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("cumulative_change_count() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -447,7 +442,8 @@ public final class ExtractionMeta extends Extraction {
      */
     //Fix me
     public void changed_LOC() throws SQLException {
-        System.out.println("get changed loc");
+        long sTime = System.currentTimeMillis();
+        logger.info("get changed loc");
         for (List<Integer> keys : commit_file_patch_offset_part) {
             String real_hunk_string = hunks_cache_part.get(keys);
             if (real_hunk_string == null || real_hunk_string.equals("")) {
@@ -467,6 +463,8 @@ public final class ExtractionMeta extends Extraction {
                     + " and offset=" + keys.get(3);
             stmt.executeUpdate(sql); // 这个信息，似乎在extraction2中的detal计算时已经包含了啊。
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("changed_LOC() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -477,6 +475,7 @@ public final class ExtractionMeta extends Extraction {
      */
     public void bug_introducing() throws SQLException {
         logger.info("get bug introducing");
+        long sTime = System.currentTimeMillis();
         Map<Integer, Boolean> commitId_isBugFix = new HashMap<>();
         for (List<Integer> commit_file : commit_files) {
             int commit_id = commit_file.get(0);
@@ -622,6 +621,8 @@ public final class ExtractionMeta extends Extraction {
                 }
             }
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("initial() cost time:" + (eTime - sTime));
     }
 
     //Hunk_blame can identify the optimization of parentheses in a statement.
@@ -674,7 +675,8 @@ public final class ExtractionMeta extends Extraction {
      * @throws SQLException
      */
     public void diffusion() throws SQLException {
-        System.out.println("Update Diffusion");
+        logger.info("Update Diffusion");
+        long sTime = System.currentTimeMillis();
         if (curAttributes == null) {
             obtainCurAttributes();
         }
@@ -730,6 +732,8 @@ public final class ExtractionMeta extends Extraction {
                     + entropy + " where commit_id=" + commit_id;
             stmt.executeUpdate(sql);
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("diffusion() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -742,7 +746,8 @@ public final class ExtractionMeta extends Extraction {
      * @throws SQLException
      */
     public void size() throws SQLException {
-        System.out.println("Update Size");
+        long sTime = System.currentTimeMillis();
+        logger.info("Update Size");
         if (curAttributes == null) {
             obtainCurAttributes();
         }
@@ -758,11 +763,13 @@ public final class ExtractionMeta extends Extraction {
             String hunkString = hunks_cache_part.get(keys);
             int ldHunkLevel = countLineNumAccordingOperator(sub_operator_symbol, hunkString);
             int laHunkLevel = countLineNumAccordingOperator(add_operator_symbol, hunkString);
-            int ltHunkLevel = ldHunkLevel + laHunkLevel;
+            int ltHunkLevel = ldHunkLevel + laHunkLevel;   //Fix me
             sql = "UPDATE " + metaTableName + " SET ld=" + ldHunkLevel + " ,la=" + laHunkLevel + ",lt=" + ltHunkLevel +
                     " where patch_id=" + keys.get(2) + " and offset=" + keys.get(3);
             stmt.executeUpdate(sql);
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("size() cost time:" + (eTime - sTime));
     }
 
     private int countLineNumAccordingOperator(String operator_symbol, String hunkString) {
@@ -820,7 +827,8 @@ public final class ExtractionMeta extends Extraction {
      * @throws SQLException
      */
     public void purpose() throws SQLException {
-        System.out.println("Update purpose");
+        logger.info("Update purpose");
+        long sTime = System.currentTimeMillis();
         if (curAttributes == null) {
             obtainCurAttributes();
         }
@@ -835,6 +843,8 @@ public final class ExtractionMeta extends Extraction {
                     + " " + metaTableName + ".commit_id=" + list.get(0);
             stmt.executeUpdate(sql);
         }
+        long eTime = System.currentTimeMillis();
+        logger.info("purpose() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -847,23 +857,28 @@ public final class ExtractionMeta extends Extraction {
     //
     public void history(String gitFile) throws IOException,
             InterruptedException {
-        System.out.println("Update history With Python");
+        long sTime = System.currentTimeMillis();
+        logger.info("Update history With Python");
         String command = "python " + System.getProperty("user.dir")
                 + "/src/main/scripts/history.py -d "
                 + databaseName + " -s " + start + " -e " + end + " -g "
                 + gitFile;
-        System.out.println(command);
+        logger.info(command);
         Process pythonProcess = Runtime.getRuntime().exec(command);
         BufferedReader bReader = new BufferedReader(new InputStreamReader(
                 pythonProcess.getInputStream()));
         String line;
         while ((line = bReader.readLine()) != null) {
-            System.out.println(line);
+            logger.info(line);
         }
         BufferedReader eReader = new BufferedReader(new InputStreamReader(
                 pythonProcess.getErrorStream()));
-        while ((line = eReader.readLine()) != null)
-            pythonProcess.waitFor();
+        while ((line = eReader.readLine()) != null) {
+            logger.info(line);
+        }
+        pythonProcess.waitFor();
+        long eTime = System.currentTimeMillis();
+        logger.info("history() cost time:" + (eTime - sTime));
     }
 
     /**
@@ -1058,7 +1073,7 @@ public final class ExtractionMeta extends Extraction {
             String colName = resultSet.getMetaData().getColumnName(i);
             titleBuffer.append(colName + ",");
         }
-        titleBuffer = titleBuffer.deleteCharAt(titleBuffer.length()-1);
+        titleBuffer = titleBuffer.deleteCharAt(titleBuffer.length() - 1);
         content.put(titleIndex, titleBuffer);
 
         for (List<Integer> commit_file_patch_offest : commit_file_patch_offset_part) {
@@ -1072,7 +1087,7 @@ public final class ExtractionMeta extends Extraction {
             for (int i = titleIndex.size() + 2; i <= colCount; i++) {
                 temp.append(resultSet.getString(i) + ",");
             }
-            temp=temp.deleteCharAt(temp.length()-1);
+            temp = temp.deleteCharAt(temp.length() - 1);
             content.put(commit_file_patch_offest, temp);
         }
         return content;
