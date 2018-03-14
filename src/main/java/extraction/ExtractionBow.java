@@ -85,7 +85,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.put(titleIndex, tent.get(titleIndex).append(s + ","));
+                    tent.put(titleIndex, tent.get(titleIndex).append(ColName + ","));
                 } else if (list.get(0) == commitId) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -154,11 +154,18 @@ public class ExtractionBow extends Extraction {
             String patchString = hunks_cache_part.get(list);
             StringBuffer stringBuilder = new StringBuffer();
             String[] lines = patchString.split("\n");
+            int LAH = 0;
+            int LDH = 0;
             for (String line : lines) {
                 if (line.contains("@@ -")) {
                     stringBuilder.append(line.substring(line.lastIndexOf("@@") + 2, line.length()));
                 } else if (line.startsWith("+") || line.startsWith("-")) {
                     stringBuilder.append(line.substring(1));
+                    if (line.startsWith("+")) {
+                        LAH++;
+                    } else {
+                        LDH++;
+                    }
                 } else {
                     stringBuilder.append(line);
                 }
@@ -193,7 +200,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.get(titleIndex).append(s + ",");
+                    tent.get(titleIndex).append(ColName + ",");
                 } else if (list.get(0) == commitId && list.get(1) == fileId && list.get(2) == patch_id && list.get(3) == offset) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -256,7 +263,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.get(titleIndex).append(s + ",");
+                    tent.get(titleIndex).append(ColName + ",");
                 } else if (list.get(0) == commit_id && list.get(1) == file_id) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
