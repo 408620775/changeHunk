@@ -97,7 +97,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.put(titleIndex, tent.get(titleIndex).append(ColName + ","));
+                    tent.put(titleIndex, tent.get(titleIndex).append(s + ","));
                 } else if (list.get(0) == commitId) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -257,7 +257,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.get(titleIndex).append(ColName + ",");
+                    tent.get(titleIndex).append(s + ",");
                 } else if (list.get(0) == commitId && list.get(1) == fileId && list.get(2) == patch_id && list.get(3) == offset) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -320,7 +320,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.get(titleIndex).append(ColName + ",");
+                    tent.get(titleIndex).append(s + ",");
                 } else if (list.get(0) == commit_id && list.get(1) == file_id) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
