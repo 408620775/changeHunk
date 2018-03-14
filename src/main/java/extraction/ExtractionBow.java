@@ -37,6 +37,14 @@ public class ExtractionBow extends Extraction {
     Map<List<Integer>, StringBuffer> contentMap;
     Map<String, Integer> colMap;
     public static int patchNumStartIndex = 4;
+    public static List<String> hunkMetricsNames = Arrays.asList("NOCN", "NOL", "NOFC", "NOV", "NON",
+            "NOLO", "NORO", "NOAR", "NORS", "NOCS", "NOB", "NOO", "NOIH", "NOA");
+    public static List<List<String>> identifiers = Arrays.asList(Arrays.asList("if", "else if", "else"),
+            Arrays.asList("for", "while"), Arrays.asList("."), Arrays.asList("byte", "short", "int", "long", "float", "double",
+                    "boolean", "char"), Arrays.asList("null"), Arrays.asList("&&", "||", "!"),
+            Arrays.asList(">=", ">", "<=", "<", "=="), Arrays.asList("+", "-", "*", "/"), Arrays.asList("return"), Arrays
+                    .asList("case"), Arrays.asList("break"), Arrays.asList("new"), Arrays.asList("extends", "implements"),
+            Arrays.asList("="));
 
     /**
      * 提取第三部分信息。
@@ -57,6 +65,10 @@ public class ExtractionBow extends Extraction {
         contentMap.put(titleIndex, new StringBuffer());
         for (List<Integer> list : commit_file_patch_offset_part) {
             contentMap.put(list, new StringBuffer());
+        }
+        if (hunkMetricsNames.size() != identifiers.size()) {
+            logger.error("The size of hunkMetricsNames is not same as the size of identifiers.");
+            return;
         }
         changeLogInfo();
         patchInfo();
@@ -152,30 +164,75 @@ public class ExtractionBow extends Extraction {
         logger.info("Extract source info.");
         for (List<Integer> list : commit_file_patch_offset_part) {
             String patchString = hunks_cache_part.get(list);
-            StringBuffer stringBuilder = new StringBuffer();
+            StringBuffer forSourceParse = new StringBuffer();
+            List<String> forMetricsParse = new ArrayList<>();
             String[] lines = patchString.split("\n");
+            Map<String, Integer> hunkMetrics = new LinkedHashMap<>();
             int LAH = 0;
             int LDH = 0;
             for (String line : lines) {
                 if (line.contains("@@ -")) {
-                    stringBuilder.append(line.substring(line.lastIndexOf("@@") + 2, line.length()));
+                    line = line.substring(line.lastIndexOf("@@") + 2, line.length());
+                    forSourceParse.append(line);
+                    forMetricsParse.add(line);
                 } else if (line.startsWith("+") || line.startsWith("-")) {
-                    stringBuilder.append(line.substring(1));
                     if (line.startsWith("+")) {
                         LAH++;
                     } else {
                         LDH++;
                     }
+                    line = line.substring(1);
+                    forSourceParse.append(line);
+                    forMetricsParse.add(line);
                 } else {
-                    stringBuilder.append(line);
+                    forSourceParse.append(line);
+                    forMetricsParse.add(line);
                 }
             }
-            Map<String, Integer> patchMap = Bow.bowP(stringBuilder.toString());  //fix me
+            hunkMetrics.put("LAH", LAH);
+            hunkMetrics.put("LDH", LDH);
+            hunkMetrics.put("NOH", LAH + LDH);
+            int[] values = dealWithHunkMetrics(hunkMetrics, forMetricsParse);
+            for (int i = 0; i < hunkMetricsNames.size(); i++) {
+                hunkMetrics.put(hunkMetricsNames.get(i), values[i]);
+            }
+            Map<String, Integer> patchMap = Bow.bowP(forSourceParse.toString());  //fix me
             for (String s : patchMap.keySet()) {
                 contentMap = writeInfo(s, contentMap, list.get(0), list.get(1), list.get(2), list.get(3),
                         patchMap.get(s));
             }
+            for (String s : hunkMetrics.keySet()) {
+                contentMap = writeInfo(s, contentMap, list.get(0), list.get(1), list.get(2), list.get(3),
+                        hunkMetrics.get(s));
+            }
         }
+    }
+
+    private int[] dealWithHunkMetrics(Map<String, Integer> hunkMetrics, List<String> lines) {
+        String[] annotatedStartIdentifier = {"*", "/"};
+        int[] values = new int[hunkMetricsNames.size()];
+        for (String line : lines) {
+            line = line.trim();
+            boolean annotatedLine = false;
+            for (String startIdentifier : annotatedStartIdentifier) {  // whether it is an annotated line.
+                if (line.startsWith(startIdentifier)) {
+                    annotatedLine = true;
+                    break;
+                }
+            }
+            if (annotatedLine) {
+                continue;
+            }
+            for (int i = 0; i < identifiers.size(); i++) {
+                for (int j = 0; j < identifiers.get(i).size(); j++) {
+                    if (line.contains(identifiers.get(i).get(j))) {
+                        values[i]++;
+                        line = line.replace(identifiers.get(i).get(j), " ");
+                    }
+                }
+            }
+        }
+        return values;
     }
 
     /**
