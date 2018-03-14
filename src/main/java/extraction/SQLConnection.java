@@ -19,8 +19,9 @@ public class SQLConnection {
     Statement stmt = null;
     private String drivername, databasename, userName, password;
     public static SQLConnection sqlL = null;
+    private static String curDatabaseName = "";
 
-    private SQLConnection(String baseName,String propName) {
+    private SQLConnection(String baseName, String propName) {
         File propsfile = new File(propName);
         try {
             FileInputStream fis = new FileInputStream(propsfile);
@@ -59,9 +60,9 @@ public class SQLConnection {
         return databasename;
     }
 
-    public static SQLConnection getConnection(String database,String databasePropertyPath) {
-        if (sqlL == null) {
-            sqlL = new SQLConnection(database,databasePropertyPath);
+    public static SQLConnection getConnection(String database, String databasePropertyPath) {
+        if (sqlL == null || (!database.equals(curDatabaseName))) {
+            sqlL = new SQLConnection(database, databasePropertyPath);
         }
         return sqlL;
     }

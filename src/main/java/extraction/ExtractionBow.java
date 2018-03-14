@@ -41,7 +41,7 @@ public class ExtractionBow extends Extraction {
     /**
      * 提取第三部分信息。
      *
-     * @param database    需要连接的数据库
+     * @param database 需要连接的数据库
      * @param startId
      * @param endId
      * @throws Exception
@@ -123,7 +123,7 @@ public class ExtractionBow extends Extraction {
      * @throws IOException
      */
     public void changeLogInfo() throws SQLException, IOException {
-        System.out.println("extract changLog info.");
+        logger.info("Extract changLog info.");
         for (Integer commitId : commit_parts) {
             if (commitId != -1) {
                 sql = "select message from scmlog where id=" + commitId;
@@ -169,7 +169,6 @@ public class ExtractionBow extends Extraction {
                         patchMap.get(s));
             }
         }
-
     }
 
     /**
@@ -230,7 +229,7 @@ public class ExtractionBow extends Extraction {
      * @throws IOException
      */
     public void pathInfo() throws SQLException, IOException {
-        logger.info("extract path info.");
+        logger.info("Extract path info.");
         for (List<Integer> list : commit_file_parts) {
             sql = "select current_file_path from actions where commit_id="
                     + list.get(0) + " and file_id=" + list.get(1);
@@ -298,11 +297,18 @@ public class ExtractionBow extends Extraction {
 
     @Override
     public Map<List<Integer>, StringBuffer> getContentMap() throws SQLException {
+
+        for (List<Integer> key : contentMap.keySet()) {
+            StringBuffer value = contentMap.get(key);
+            if (value.charAt(value.length() - 1) == ',') {
+                contentMap.put(key, value.deleteCharAt(value.length() - 1));
+            }
+        }
         return contentMap;
     }
 
     public static void main(String[] args) throws Exception {
-        ExtractionBow extractionBow= new ExtractionBow("MyVoldemort",501,800);
-        FileOperation.writeContentMap(extractionBow.getContentMap(),"MyVoldemortBow.csv");
+        ExtractionBow extractionBow = new ExtractionBow("MyVoldemort", 501, 800);
+        FileOperation.writeContentMap(extractionBow.getContentMap(), "MyVoldemortBow.csv");
     }
 }

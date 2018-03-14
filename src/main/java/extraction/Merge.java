@@ -25,7 +25,7 @@ public final class Merge {
         }
         for (List<Integer> keyList: resMap.keySet()) {
             for (Map<List<Integer>, StringBuffer> part : list) {
-                resMap.get(keyList).append(part.get(keyList));
+                resMap.get(keyList).append(part.get(keyList)+",");
             }
             if (resMap.get(keyList).charAt(resMap.get(keyList).length()-1)==',') {
                 resMap.get(keyList).deleteCharAt(resMap.get(keyList).length()-1);

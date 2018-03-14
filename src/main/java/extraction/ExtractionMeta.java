@@ -1068,7 +1068,6 @@ public final class ExtractionMeta extends Extraction {
         sql = "select * from " + metaTableName + " where id=1";
         resultSet = stmt.executeQuery(sql);
         int colcount = resultSet.getMetaData().getColumnCount();
-        int labelIndex = 0;
         for (int i = titleIndex.size() + 2; i <= colcount; i++) {
             String colName = resultSet.getMetaData().getColumnName(i);
             titleBuffer.append(colName + ",");

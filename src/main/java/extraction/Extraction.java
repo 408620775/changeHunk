@@ -24,10 +24,7 @@ import java.util.*;
  */
 public abstract class Extraction {
     private static Logger logger = Logger.getLogger(ExtractionMeta.class);
-    public static int start;
-    public static int end;
     public static String sql;
-    public static String databaseName;
     public static String metaTableName = "metaHunk";
     public static String metaTableNamekey = "MetaTableName";
     public static String hunkStringStartFlag = "@@ -";
@@ -35,28 +32,32 @@ public abstract class Extraction {
     public static Statement stmt;
     public static ResultSet resultSet;
     public static SQLConnection sqlL;
-    public static List<Integer> commits;
-    public static List<Integer> commit_parts;
     public static List<Integer> titleIndex = Arrays.asList(-1, -1, -1, -1);
     public static List<String> titleName = Arrays.asList("commit_id", "file_id", "patch_id", "offset");
+    public static String databasePropertyPath = "src/main/resources/database.properties";
+
+    public static int start;
+    public static int end;
+    public static String databaseName = "";
+    public static List<Integer> commits;
+    public static List<Integer> commit_parts;
     public static List<List<Integer>> commit_file_parts;
     public static List<List<Integer>> commit_files;
     public static List<List<Integer>> commit_file_patch_offset_part;
     public static List<List<Integer>> commit_file_patch_offsets;
     public static Map<List<Integer>, String> hunks_cache_part;
-    public static String databasePropertyPath = "src/main/resources/database.properties";
 
-    public Extraction(String database, int start, int end) throws IOException, SQLException {
-        logger.info("Extract " + database + " information. The start commit_id is " + start + " and the end commit_id is " + end);
-        this.start = start;
-        this.end = end;
-        this.databaseName = database;
-        this.sqlL = SQLConnection.getConnection(database, databasePropertyPath);
-        this.stmt = sqlL.getStmt();
-        if (commits == null) {
+
+    public Extraction(String database, int startId, int endId) throws IOException, SQLException {
+        if (!database.equals(databaseName)) {
+            logger.info("Extract " + database + " information. The start commit_id is " + startId + " and the end " +
+                    "commit_id is " + endId);
+            start = startId;
+            end = endId;
+            databaseName = database;
+            sqlL = SQLConnection.getConnection(database, databasePropertyPath);
+            stmt = sqlL.getStmt();
             initialKeys();
-        }
-        if (!hasLoadProperty) {
             loadProperty(databasePropertyPath);
         }
     }

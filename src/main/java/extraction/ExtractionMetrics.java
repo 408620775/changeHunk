@@ -246,6 +246,7 @@ public final class ExtractionMetrics extends Extraction {
         for (String attri : attributes) {
             titleBuffer.append(attri + ",");
         }
+        titleBuffer.deleteCharAt(titleBuffer.length()-1);
         contentMap.put(titleIndex, titleBuffer);
 
         for (String file : curFiles) {
@@ -264,7 +265,7 @@ public final class ExtractionMetrics extends Extraction {
                     temp.append(0 + ",");
                 }
             }
-            contentMap.put(cf, temp);
+            contentMap.put(cf, temp.deleteCharAt(temp.length()-1));
         }
     }
 
@@ -274,7 +275,7 @@ public final class ExtractionMetrics extends Extraction {
      * @throws SQLException
      */
     public void creatDeltMetrics() throws SQLException {
-        System.out.println("构造delta复杂度");
+        logger.info("构造delta复杂度");
         Set<String> deltaArrSet = new HashSet<>();
         for (String attribute : attributes) {
             String deltaAttri = attribute + "_delta";

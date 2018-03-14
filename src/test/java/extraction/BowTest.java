@@ -15,6 +15,8 @@ public class BowTest {
         for (String s : map.keySet()) {
             System.out.println(s+":"+map.get(s));
         }
+        String s = "text.replace(test,'')";
+        System.out.println(s.replace("(|)"," "));
     }
 
 }

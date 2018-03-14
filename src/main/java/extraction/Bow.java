@@ -1,6 +1,8 @@
 package extraction;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -47,6 +49,9 @@ public final class Bow {
             }
             String subString = text.substring(startIndex, endIndex);
             subString = subString.toLowerCase();
+            if (subString.equals("")){
+                continue;
+            }
             if (bag.keySet().contains(subString)) {
                 bag.put(subString, bag.get(subString) + 1);
             } else {
@@ -117,9 +122,26 @@ public final class Bow {
         if (text == null || text.length() == 0) {
             return bag;
         }
+        List<Character> replaceChar = Arrays.asList('(', ')', '\'', '.', '\\', ';', ',', '"', ':', '[', ']', '{', '}',
+                '/', '*', '<', '>','+','-','%','=','!','@','?','&');
+        for (Character character : replaceChar) {
+            text = text.replace(character, ' ');
+        }
         String[] strings = text.split("\\s+");
         for (String subString : strings) {
-            if (subString.equals("")){
+            if (subString.equals("")) {
+                continue;
+            }
+            if (subString.contains("++")) {
+                String temp = "++";
+                if (bag.keySet().contains(temp)) {
+                    bag.put(temp, bag.get(temp) + 1);
+                } else {
+                    bag.put(temp, 1);
+                }
+                subString = subString.replace("++", "");
+            }
+            if (subString.equals("")) {
                 continue;
             }
             if (bag.keySet().contains(subString)) {
@@ -212,6 +234,9 @@ public final class Bow {
                     }
                     String temp = string.substring(startIndex, endIndex)
                             .toLowerCase(); // 之前没有处理大小写转换问题。
+                    if (temp.contains(".")){
+                        temp = temp.substring(0,temp.indexOf('.')); //Delete file extension
+                    }
                     if (bag.keySet().contains(temp)) {
                         bag.put(temp, bag.get(temp) + 1);
                     } else {
