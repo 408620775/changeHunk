@@ -1,6 +1,7 @@
 package extraction;
 
 import org.apache.log4j.Logger;
+import util.FileOperation;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -36,6 +37,9 @@ public class ExtractionBow extends Extraction {
     Set<String> currStrings;
     Map<List<Integer>, StringBuffer> contentMap;
     Map<String, Integer> colMap;
+    Set<String> fileLevelWordVector;
+    Set<String> commitLevelWordVector;
+    Set<String> hunkLevelWordVector;
     public static int patchNumStartIndex = 4;
     public static List<String> hunkMetricsNames = Arrays.asList("NOCN", "NOL", "NOFC", "NOV", "NON",
             "NOLO", "NORO", "NOAR", "NORS", "NOCS", "NOB", "NOO", "NOIH", "NOA");
@@ -58,7 +62,7 @@ public class ExtractionBow extends Extraction {
                          int endId) throws Exception {
         super(database, startId, endId);
 
-        dictionary = new HashMap<>();
+        dictionary = new LinkedHashMap<>();
         currStrings = new HashSet<>();
         contentMap = new LinkedHashMap<>();
         colMap = new HashMap<>();
@@ -70,6 +74,9 @@ public class ExtractionBow extends Extraction {
             logger.error("The size of hunkMetricsNames is not same as the size of identifiers.");
             return;
         }
+        commitLevelWordVector = new HashSet<>();
+        fileLevelWordVector = new HashSet<>();
+        hunkLevelWordVector = new HashSet<>();
         changeLogInfo();
         patchInfo();
         pathInfo();
@@ -97,7 +104,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.put(titleIndex, tent.get(titleIndex).append(s + ","));
+                    tent.put(titleIndex, tent.get(titleIndex).append(ColName + ","));
                 } else if (list.get(0) == commitId) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -144,6 +151,7 @@ public class ExtractionBow extends Extraction {
                 String message = resultSet.getString(1);
                 Map<String, Integer> bp = Bow.bow(message);
                 for (String s : bp.keySet()) {
+                    commitLevelWordVector.add(s);
                     contentMap = writeInfo(s, contentMap, commitId, bp.get(s));
                 }
             }
@@ -196,10 +204,18 @@ public class ExtractionBow extends Extraction {
             for (int i = 0; i < hunkMetricsNames.size(); i++) {
                 hunkMetrics.put(hunkMetricsNames.get(i), values[i]);
             }
-            Map<String, Integer> patchMap = Bow.bowP(forSourceParse.toString());  //fix me
+            Map<String, Integer> patchMap = Bow.bowP(forSourceParse.toString());
+            for (List<String> identifierGroup : identifiers) {  //hunk matric is retained when word vectors and hunk metric are repeated.
+                for (String identifier : identifierGroup) {
+                    if (patchMap.containsKey(identifier)){
+                        patchMap.remove(identifier);
+                    }
+                }
+            }
             for (String s : patchMap.keySet()) {
                 contentMap = writeInfo(s, contentMap, list.get(0), list.get(1), list.get(2), list.get(3),
                         patchMap.get(s));
+                hunkLevelWordVector.add(s);
             }
             for (String s : hunkMetrics.keySet()) {
                 contentMap = writeInfo(s, contentMap, list.get(0), list.get(1), list.get(2), list.get(3),
@@ -257,7 +273,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.get(titleIndex).append(s + ",");
+                    tent.get(titleIndex).append(ColName + ",");
                 } else if (list.get(0) == commitId && list.get(1) == fileId && list.get(2) == patch_id && list.get(3) == offset) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -304,6 +320,7 @@ public class ExtractionBow extends Extraction {
             String path = resultSet.getString(1);
             Map<String, Integer> pathName = Bow.bowPP(path);
             for (String s : pathName.keySet()) {
+                fileLevelWordVector.add(s);
                 contentMap = writeInfo(s, contentMap, list.get(0), list.get(1), // 两个函数可以整合为一个
                         pathName.get(s));
             }
@@ -320,7 +337,7 @@ public class ExtractionBow extends Extraction {
 
             for (List<Integer> list : tent.keySet()) {
                 if (list.get(0) == -1) {
-                    tent.get(titleIndex).append(s + ",");
+                    tent.get(titleIndex).append(ColName + ",");
                 } else if (list.get(0) == commit_id && list.get(1) == file_id) {
                     tent.put(list, tent.get(list).append(value + ","));
                 } else {
@@ -369,10 +386,5 @@ public class ExtractionBow extends Extraction {
             }
         }
         return contentMap;
-    }
-
-    public static void main(String[] args) throws Exception {
-        ExtractionBow extractionBow = new ExtractionBow("MyVoldemort", 501, 800);
-        FileOperation.writeContentMap(extractionBow.getContentMap(), "MyVoldemortBow.csv");
     }
 }

@@ -1,6 +1,8 @@
 package extraction;
 
 import org.apache.log4j.Logger;
+import util.FileOperation;
+import util.PropertyUtil;
 
 import java.io.*;
 import java.sql.SQLException;
@@ -638,7 +640,7 @@ public final class ExtractionMeta extends Extraction {
             }
             if (line.startsWith(operator)) {
                 line = line.substring(operator.length()).trim().replaceAll("\\s+|\t", "");
-                if (line.equals("")){
+                if (line.equals("")) {
                     continue;
                 }
                 res.add(line);
@@ -763,13 +765,29 @@ public final class ExtractionMeta extends Extraction {
             String hunkString = hunks_cache_part.get(keys);
             int ldHunkLevel = countLineNumAccordingOperator(sub_operator_symbol, hunkString);
             int laHunkLevel = countLineNumAccordingOperator(add_operator_symbol, hunkString);
-            int ltHunkLevel = ldHunkLevel + laHunkLevel;   //Fix me
+            int ltHunkLevel = countHunkLOCBeforeChange(hunkString);
             sql = "UPDATE " + metaTableName + " SET ld=" + ldHunkLevel + " ,la=" + laHunkLevel + ",lt=" + ltHunkLevel +
                     " where patch_id=" + keys.get(2) + " and offset=" + keys.get(3);
             stmt.executeUpdate(sql);
         }
         long eTime = System.currentTimeMillis();
         logger.info("size() cost time:" + (eTime - sTime));
+    }
+
+    private int countHunkLOCBeforeChange(String hunkString) {
+        if (hunkString == null || hunkString.equals("")) {
+            return 0;
+        }
+        String[] lines = hunkString.split(line_break_symbol);
+        for (String line : lines) {
+            line = line.trim();
+            if (line.startsWith("@@ -")) {
+                int length = line.substring(line.indexOf(",") + 1, line.indexOf("+")).length();
+                return length;
+            }
+        }
+        logger.error("Can't find length of hunk before change.");
+        return 0;
     }
 
     private int countLineNumAccordingOperator(String operator_symbol, String hunkString) {
@@ -1120,19 +1138,19 @@ public final class ExtractionMeta extends Extraction {
         return (double) bug / total;
     }
 
-    public void HunkMetrics() throws SQLException {
-        logger.info("Get HunkMetrics");
-        if (curAttributes == null) {
-            obtainCurAttributes();
+    public void getLOCFileForClassification(String savePath) throws SQLException, IOException {
+        StringBuffer locInfo = new StringBuffer();
+        for (List<Integer> key : commit_file_patch_offset_part) {
+            sql = "select la,ld from " + metaTableName + " where commit_id=" + key.get(0) + " and file_id=" + key.get(1)
+                    + " and patch_id=" + key.get(2) + " and offset=" + key.get(3);
+            resultSet = stmt.executeQuery(sql);
+            while (resultSet.next()) {
+                int ChangeLocInHunk = resultSet.getInt(1) + resultSet.getInt(2);
+                locInfo.append(key.get(0) + "," + key.get(1) + "," + key.get(2) + "," + key.get(3) + "," + ChangeLocInHunk
+                        + PropertyUtil.LINE_BREAKER);
+            }
         }
-        if (!curAttributes.contains("ns")) {
-            sql = "alter table " + metaTableName + " add (ns int(4),nd int(4),nf int(4),entropy float)";
-            stmt.executeUpdate(sql);
-            curAttributes.add("ns");
-            curAttributes.add("nd");
-            curAttributes.add("nf");
-            curAttributes.add("entropy");
-        }
+        FileOperation.writeStringBuffer(locInfo, savePath);
     }
 }
 

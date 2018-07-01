@@ -1,13 +1,10 @@
 package extraction;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import util.PropertyUtil;
+
+import java.io.*;
 import java.text.DecimalFormat;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 工具类,用于处理一些简单的数学运算,禁止实例化.
@@ -125,5 +122,52 @@ public class MyTool {
         }
         bWriter.flush();
         bWriter.close();
+    }
+
+    public static void countAttributeShare(int sharedNum,String arffsFolder,String dictsFolder) throws IOException {
+        Map<String,List<String>> attribute_count = new LinkedHashMap<>();
+        for (String[] projectInfo : PropertyUtil.projectsInfo) {
+            Map<String,String> tmpMap = new LinkedHashMap<>();
+            BufferedReader bReader = new BufferedReader(new FileReader(new File(dictsFolder+"/"+projectInfo[0]+"Dict")));
+            String line;
+            while ((line=bReader.readLine())!=null){
+                if (line.equals("")){
+                    continue;
+                }
+                String[] arrays = line.trim().split("\\s+" );
+                if (arrays.length!=2){
+                    System.out.println(line);
+                }
+                //System.out.println(line);
+                tmpMap.put(arrays[1],arrays[0]);
+            }
+            bReader.close();
+            bReader = new BufferedReader(new FileReader(new File(arffsFolder+"/"+projectInfo[0]+".arff")));
+            line = bReader.readLine();
+            line = bReader.readLine();
+            while ((line=bReader.readLine())!=null){
+                if (line.startsWith("@attribute")){
+                     String[] array = line.split("\\s+");
+                     String attributeName = array[1];
+                     if (attributeName.charAt(0)=='s'&&Character.isDigit(attributeName.charAt(1))){
+                         attributeName = tmpMap.get(attributeName);
+                     }
+                     if (attribute_count.containsKey(attributeName)){
+                         attribute_count.get(attributeName).add(projectInfo[0]);
+                     }else{
+                         List<String> list = new ArrayList<>();
+                         list.add(projectInfo[0]);
+                         attribute_count.put(attributeName,list);
+                     }
+                }else{
+                    break;
+                }
+            }
+        }
+        for (String attribute : attribute_count.keySet()) {
+            if (attribute_count.get(attribute).size()>=sharedNum){
+                System.out.println(attribute+":"+attribute_count.get(attribute));
+            }
+        }
     }
 }

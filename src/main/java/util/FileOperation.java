@@ -1,4 +1,6 @@
-package extraction;
+package util;
+
+import extraction.Extraction;
 
 import java.io.BufferedWriter;
 import java.io.File;

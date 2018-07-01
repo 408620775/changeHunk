@@ -1,6 +1,7 @@
 package extraction;
 
 import org.apache.log4j.Logger;
+import util.FileOperation;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
